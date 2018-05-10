@@ -26,3 +26,4 @@ Expected Outcomes
 
 The implementation of Controller and Device
 Use the Phone to bootstrap the device; then the device is able to communicate with the laptop
+slide deck for design details: https://www.dropbox.com/s/6vxk13cho3isqdp/IoT%20security%20bootstrapping.pptx?dl=0
