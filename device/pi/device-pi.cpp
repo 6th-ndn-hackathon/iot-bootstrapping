@@ -34,7 +34,7 @@ DevicePi::importBootstrappingKey(const char* path)
 
   std::cout << "key name from safebag: " << keyName << std::endl;
   // load public key
-  const Buffer publicKeyBits = m_cert.getPublicKey();
+  const Buffer publicKeyBits = m_bootstrappingCert.getPublicKey();
   m_pub.loadPkcs8(publicKeyBits.data(), publicKeyBits.size());
 
   // load private key
@@ -45,7 +45,7 @@ DevicePi::importBootstrappingKey(const char* path)
 name::Component
 DevicePi::makeBootstrappingKeyDigest()
 {
-  const Buffer publicKeyBits = m_cert.getPublicKey();
+  const Buffer publicKeyBits = m_bootstrappingCert.getPublicKey();
   ndn::util::Sha256 digest;
   digest.update(publicKeyBits.data(), publicKeyBits.size());
   digest.computeDigest();

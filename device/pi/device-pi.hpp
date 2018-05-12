@@ -22,7 +22,7 @@ public:
 
 private:
   ndn::Name m_bkName;
-  ndn::security::v2::Certificate m_cert;
+  ndn::security::v2::Certificate m_bootstrappingCert;
   ndn::security::transform::PrivateKey m_prv;
   ndn::security::transform::PublicKey m_pub;
 };
