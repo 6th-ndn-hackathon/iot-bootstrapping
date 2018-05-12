@@ -44,6 +44,9 @@ public:
   virtual ndn::name::Component
   makeTokenSignature(const uint64_t& token) = 0;
 
+  virtual bool
+  verifyHash(const std::string& hash);
+
 public:
   /**
    * @brief run the device site of the sign-on protocol

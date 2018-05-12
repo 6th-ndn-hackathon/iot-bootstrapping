@@ -2,6 +2,8 @@
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/util/random.hpp>
 #include <ndn-cxx/security/pib/identity.hpp>
+#include <ndn-cxx/util/io.hpp>
+#include <ndn-cxx/util/sha256.hpp>
 #include <map>
 #include <iostream>
 #include <logger.hpp>
@@ -13,7 +15,7 @@ namespace std
     {
       bool operator() (const Name::Component& lhs, const Name::Component& rhs) const
        {
-	 return lhs.compare(rhs) < 0;
+         return lhs.compare(rhs) < 0;
        }
     };
 }
@@ -21,7 +23,7 @@ namespace std
 class Controller
 {
 public:
-  Controller(const Name& prefix);
+  Controller(const Name& prefix, const std::string& filename);
 
 public:
   int run();
@@ -38,6 +40,8 @@ private:
   KeyChain m_keyChain;
   security::Identity m_identity;
 
+  security::v2::Certificate m_deviceCert;
+
   struct DeviceInfo {
     int BKpub; // TODO-1: Edward, this should be loaded from the QR code; zhiyi, please specify the correct formate here
     uint64_t token;
@@ -48,10 +52,12 @@ private:
   DeviceList devices;
 };
 
-Controller::Controller(const Name& prefix)
+Controller::Controller(const Name& prefix, const std::string& filename)
   : m_homePrefix(prefix)
   , m_identity(m_keyChain.createIdentity(m_homePrefix))
 {
+  m_deviceCert = *(io::load<ndn::security::v2::Certificate>(filename));
+  std::cout << m_deviceCert.getName() << std::endl;
 }
 
 void
@@ -99,6 +105,21 @@ Controller::onBootstrappingRequest(const Interest& request)
   auto content = makeEmptyBlock(tlv::Content);
   content.push_back(anchorCert.wireEncode());
   content.push_back(makeNonNegativeIntegerBlock(129, token));
+
+  std::cout << "before get key" << std::endl;
+
+  auto pubKey = m_deviceCert.getPublicKey();
+  auto pubKey2 = m_deviceCert.getPublicKey();
+  pubKey.insert(pubKey.end(), pubKey2.begin(), pubKey2.end());
+
+  std::cout << "before digest" << std::endl;
+
+  ndn::util::Sha256 digest;
+  digest.update(pubKey.data(), pubKey.size());
+  digest.computeDigest();
+  std::cout << "hash = " << digest.toString() << std::endl;
+
+  content.push_back(makeStringBlock(130, digest.toString()));
   std::cout << "token = " << token << std::endl;
 
   Data data(Name(name).appendVersion());
@@ -173,6 +194,6 @@ Controller::run()
 
 int main(int argc, char** argv)
 {
-  Controller controller("/ucla/eiv396");
+  Controller controller("/ucla/eiv396", "/Users/ZhangZhiyi/Develop/ndn-iot-device-signon/controller/linux/pi-pub.key");
   return controller.run();
 }

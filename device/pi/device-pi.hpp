@@ -20,6 +20,9 @@ public:
   virtual ndn::name::Component
   makeTokenSignature(const uint64_t& token);
 
+  virtual bool
+  verifyHash(const std::string& hash);
+
 private:
   ndn::Name m_bkName;
   ndn::security::v2::Certificate m_bootstrappingCert;

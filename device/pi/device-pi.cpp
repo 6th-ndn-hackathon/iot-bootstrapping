@@ -75,3 +75,19 @@ DevicePi::makeTokenSignature(const uint64_t& token)
 
   return name::Component(sigValue);
 }
+
+
+bool
+DevicePi::verifyHash(const std::string& hash)
+{
+  auto pubKey = m_bootstrappingCert.getPublicKey();
+  auto pubKey2 = m_bootstrappingCert.getPublicKey();
+  pubKey.insert(pubKey.end(), pubKey2.begin(), pubKey2.end());
+  ndn::util::Sha256 digest;
+  digest.update(pubKey.data(), pubKey.size());
+  digest.computeDigest();
+  if (hash == digest.toString())
+    return true;
+
+  return false;
+}

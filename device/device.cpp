@@ -11,7 +11,7 @@ int
 Device::run()
 {
   LOG_INFO("device site starts");
-  
+
   expressBootstrappingRequest();
 
   m_face.processEvents();
@@ -22,7 +22,7 @@ void
 Device::expressBootstrappingRequest()
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    LOG_FAILURE("received Nack with reason ", nack.getReason());    
+    LOG_FAILURE("received Nack with reason ", nack.getReason());
   };
 
   auto request = makeBootstrappingRequest();
@@ -64,11 +64,17 @@ Device::onBootstrappingResponse(const ndn::Data& data)
     return;
   }
 
-  // TODO-1: zhiyi, please add decryption here.
   m_anchor = security::v2::Certificate(content.get(tlv::Data));
   auto token = readNonNegativeInteger(content.get(129));
-  std::cout << m_anchor << std::endl;
+  auto hash = readString(content.get(130));
+
+  if (!verifyHash(hash)) {
+    std::cout << "can not verify the signature of the sign-on response" << std::endl;
+    return;
+  }
+
   std::cout << "token = " << token << std::endl;
+  std::cout << "hash = " << hash << std::endl;
 
   if (verifyData(data, m_anchor)) {
     expressCertificateRequest(m_anchor.getIdentity(), token);
@@ -82,14 +88,14 @@ void
 Device::expressCertificateRequest(const ndn::Name& prefix, const uint64_t& token)
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    LOG_FAILURE("certificate", "received Nack with reason " << nack.getReason());    
+    LOG_FAILURE("certificate", "received Nack with reason " << nack.getReason());
   };
 
   auto request = makeCertificateRequest(prefix, token);
   m_face.expressInterest(request,
-			 bind(&Device::onCertificateResponse, this, _2),
-			 onNack,
-			 bind(&Device::expressCertificateRequest, this, prefix, token));
+                         bind(&Device::onCertificateResponse, this, _2),
+                         onNack,
+                         bind(&Device::expressCertificateRequest, this, prefix, token));
 
   LOG_INTEREST_OUT(request);
 }
@@ -115,15 +121,21 @@ void
 Device::onCertificateResponse(const ndn::Data& data)
 {
   LOG_DATA_IN(data);
-  // TODO-2: zhiyi, please verify the data, the certificate and install the certificate here.
 
   verifyData(data, m_anchor);
 
-  ndn::security::v2::Certificate cert(data.getContent().blockFromValue());
-  auto& pib = m_keyChain.getPib();
-  ndn::security::Identity id = pib.getIdentity(cert.getIdentity());
-  ndn::security::Key key = id.getKey(cert.getKeyName());
-  m_keyChain.addCertificate(key, cert);
+  // verify signature
+  if (verifyData(data, m_anchor)) {
+    // install cert
+    ndn::security::v2::Certificate cert(data.getContent().blockFromValue());
+    auto& pib = m_keyChain.getPib();
+    ndn::security::Identity id = pib.getIdentity(cert.getIdentity());
+    ndn::security::Key key = id.getKey(cert.getKeyName());
+    m_keyChain.addCertificate(key, cert);
+  }
+  else {
+    std::cout << "can not verify the signature of the cert-request response" << std::endl;
+  }
 }
 
 void
@@ -137,4 +149,9 @@ bool
 Device::verifyData(const ndn::Data& data, const security::v2::Certificate& certificate)
 {
   return ndn::security::verifySignature(data, certificate);
+}
+
+bool
+Device::verifyHash(const std::string& hash) {
+  return true;
 }
