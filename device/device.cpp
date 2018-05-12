@@ -1,6 +1,7 @@
 #include "device.hpp"
 #include <ndn-cxx/util/random.hpp>
 #include <ndn-cxx/security/v2/certificate.hpp>
+#include <ndn-cxx/security/verification-helpers.hpp>
 #include <ndn-cxx/encoding/tlv.hpp>
 #include <iostream>
 using namespace ndn;
@@ -60,13 +61,13 @@ Device::onBootstrappingResponse(const ndn::Data& data)
   }
 
   // TODO-1: zhiyi, please add decryption here.
-  security::v2::Certificate anchorCert(content.get(tlv::Data));
+  m_anchor = security::v2::Certificate(content.get(tlv::Data));
   auto token = readNonNegativeInteger(content.get(129));
-  std::cout << anchorCert << std::endl;
+  std::cout << m_anchor << std::endl;
   std::cout << "token = " << token << std::endl;
 
-  if (verifyData(data, anchorCert)) {
-    expressCertificateRequest(anchorCert.getIdentity(), token);
+  if (verifyData(data, m_anchor)) {
+    expressCertificateRequest(m_anchor.getIdentity(), token);
   }
   else {
     std::cout << "can not verify the signature of the sign-on response" << std::endl;
@@ -108,6 +109,9 @@ Device::onCertificateResponse(const ndn::Data& data)
 {
   std::cout << " >> D: " << data << std::endl;
   // TODO-2: zhiyi, please verify the data, the certificate and install the certificate here.
+
+  verifyData(data, m_anchor);
+
   ndn::security::v2::Certificate cert(data.getContent().blockFromValue());
   auto& pib = m_keyChain.getPib();
   ndn::security::Identity id = pib.getIdentity(cert.getIdentity());
@@ -125,6 +129,5 @@ Device::signRequest(ndn::Interest& request)
 bool
 Device::verifyData(const ndn::Data& data, const security::v2::Certificate& certificate)
 {
-  // implement different versions in different subclasses
-  return true;
+  return ndn::security::verifySignature(data, certificate);
 }
