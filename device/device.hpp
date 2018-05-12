@@ -54,12 +54,11 @@ public:
   /**
    * @brief make the bootstrapping request
    *
-   * name: /ndn/sign-on/Hash(BKpub)/token1/{ECDSA signature by BKpri}
+   * name: /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
    *
-   * @param token token1
    */
   ndn::Interest
-  makeBootstrappingRequest(const uint64_t& token);
+  makeBootstrappingRequest();
 
   /**
    * @brief express the bootstrapping request
@@ -69,7 +68,7 @@ public:
   expressBootstrappingRequest();
 
   void
-  onBootstrappingResponse(const ndn::Data& data, const uint64_t& token);
+  onBootstrappingResponse(const ndn::Data& data);
 
   /**
    * @brief make the certificate request
@@ -97,7 +96,7 @@ protected:
   signRequest(ndn::Interest& request);
 
   virtual bool
-  verifyData(const ndn::Data& data, const ndn::Block& certificate);
+  verifyData(const ndn::Data& data, const ndn::security::v2::Certificate& certificate);
 
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;

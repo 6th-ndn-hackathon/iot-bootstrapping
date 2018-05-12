@@ -23,20 +23,17 @@ Device::expressBootstrappingRequest()
     std::cout << "received Nack with reason " << nack.getReason() << std::endl;    
   };
   
-  auto token = random::generateWord64();
-  m_face.expressInterest(makeBootstrappingRequest(token),
-			 bind(&Device::onBootstrappingResponse, this, _2, token),
+  m_face.expressInterest(makeBootstrappingRequest(),
+			 bind(&Device::onBootstrappingResponse, this, _2),
 			 onNack,
 			 bind(&Device::expressBootstrappingRequest, this));
 }
 
 ndn::Interest
-Device::makeBootstrappingRequest(const uint64_t& token)
+Device::makeBootstrappingRequest()
 {
-  // /ndn/sign-on/Hash(BKpub)/token1/{ECDSA signature by BKpri}
-  auto name = Name("/ndn/sign-on");
-  name.append(makeBootstrappingKeyDigest())
-      .append(name::Component::fromNumber(token));
+  // /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
+  auto name = Name("/ndn/sign-on").append(makeBootstrappingKeyDigest());
 
   auto request = Interest(name, 2_s);
   request.setMustBeFresh(true);
@@ -46,9 +43,9 @@ Device::makeBootstrappingRequest(const uint64_t& token)
 }
 
 void
-Device::onBootstrappingResponse(const ndn::Data& data, const uint64_t& token)
+Device::onBootstrappingResponse(const ndn::Data& data)
 {
-  // data: {controller's public key, token1, token2}
+  // data: {controller's public key, token}
   std::cout << " >> D: " << data << std::endl;
 
   auto content = data.getContent();
@@ -62,13 +59,15 @@ Device::onBootstrappingResponse(const ndn::Data& data, const uint64_t& token)
 
   // TODO-1: zhiyi, please add decryption here.
   security::v2::Certificate anchorCert(content.get(tlv::Data));
-  auto token1 = readNonNegativeInteger(content.get(129));
-  auto token2 = readNonNegativeInteger(content.get(130));
+  auto token = readNonNegativeInteger(content.get(129));
   std::cout << anchorCert << std::endl;
-  std::cout << "token1 = " << token1 << "; token2 = " << token2 << std::endl;
+  std::cout << "token = " << token << std::endl;
 
-  if (token1 == token) {
-    expressCertificateRequest(anchorCert.getIdentity(), token2);
+  if (verifyData(data, anchorCert)) {
+    expressCertificateRequest(anchorCert.getIdentity(), token);
+  }
+  else {
+    std::cout << "can not verify the signature of the sign-on response" << std::endl;
   }
 }
 
@@ -88,7 +87,7 @@ Device::expressCertificateRequest(const ndn::Name& prefix, const uint64_t& token
 ndn::Interest
 Device::makeCertificateRequest(const Name& prefix, const uint64_t& token)
 {
-  // /[home-prefix]/cert/Hash(BKpub)/{CKpub}/{signature of token2}/{signature by BKpri}
+  // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
   auto name = prefix;
   name.append("cert")
       .append(makeBootstrappingKeyDigest())
@@ -117,7 +116,7 @@ Device::signRequest(ndn::Interest& request)
 }
 
 bool
-Device::verifyData(const ndn::Data& data, const Block& certificate)
+Device::verifyData(const ndn::Data& data, const security::v2::Certificate& certificate)
 {
   // implement different versions in different subclasses
   return true;

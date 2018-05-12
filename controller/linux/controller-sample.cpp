@@ -39,7 +39,7 @@ private:
 
   struct DeviceInfo {
     int BKpub; // TODO-1: Edward, this should be loaded from the QR code; zhiyi, please specify the correct formate here
-    uint64_t token2;
+    uint64_t token;
   };
   typedef std::map<Name::Component, struct DeviceInfo> DeviceList;
   typedef DeviceList::iterator DeviceIt;
@@ -72,10 +72,9 @@ Controller::onBootstrappingRequest(const Interest& request)
 
   // TODO-2: zhiyi, please verify the signature here
   
-  // /ndn/sign-on/Hash(BKpub)/token1/{ECDSA signature by BKpri}
+  // /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
   auto name = request.getName();
   auto BKpubHash = name.at(2);
-  auto token1 = name.at(3).toNumber();
 
   // TODO-0: currently, we do not have the QR code scanned yet
   DeviceInfo devInfo;
@@ -91,15 +90,14 @@ Controller::onBootstrappingRequest(const Interest& request)
   // TODO-3: zhiyi, please verify the hash of BKpub here
 
   auto anchorCert = getDefaultCertificate();// controller's public key
-  auto token2 = random::generateWord64();
-  devIt->second.token2 = token2;
+  auto token = random::generateWord64();
+  devIt->second.token = token;
 
   // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
   auto content = makeEmptyBlock(tlv::Content);
   content.push_back(anchorCert.wireEncode());
-  content.push_back(makeNonNegativeIntegerBlock(129, token1));
-  content.push_back(makeNonNegativeIntegerBlock(130, token2));
-  std::cout << "token1 = " << token1 << "; token2 = " << token2 << std::endl;
+  content.push_back(makeNonNegativeIntegerBlock(129, token));
+  std::cout << "token = " << token << std::endl;
 
   Data data(Name(name).appendVersion());
   data.setContent(content);
@@ -112,9 +110,9 @@ Controller::onCertificateRequest(const Interest& request)
 {
   std::cout << " << I: " << request << std::endl;
 
-  // /[home-prefix]/cert/Hash(BKpub)/{CKpub}/{signature of token2}/{signature by BKpri}
+  // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
   auto name = request.getName();
-  auto signatureOfToken2 = name.at(-3);
+  auto signatureOfToken = name.at(-3);
   auto CKpub = name.at(-4);
   auto BKpubHash = name.at(-5);
 
@@ -124,7 +122,7 @@ Controller::onCertificateRequest(const Interest& request)
     return;
   }
 
-  auto token2 = devIt->second.token2;
+  auto token = devIt->second.token;
   // TODO-5: zhiyi, please verify the signature of token2 here
 
   Name deviceName(m_homePrefix);
