@@ -1,4 +1,6 @@
 #include <device.hpp>
+#include <ndn-cxx/security/transform/private-key.hpp>
+#include <ndn-cxx/security/transform/public-key.hpp>
 
 class DevicePi : public Device
 {
@@ -20,4 +22,7 @@ public:
 
 private:
   ndn::Name m_bkName;
+  ndn::security::v2::Certificate m_cert;
+  ndn::security::transform::PrivateKey m_prv;
+  ndn::security::transform::PublicKey m_pub;
 };
