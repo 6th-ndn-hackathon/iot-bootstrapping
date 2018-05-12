@@ -1,6 +1,7 @@
 #include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <iostream>
 
 class Device
 {
@@ -16,7 +17,7 @@ public:
   /**
    * @brief make a name component for the digest of the bootstrapping key
    *
-   * @return return a name component encapsulating the digest  
+   * @return return a name component encapsulating the digest
    */
   virtual ndn::name::Component
   makeBootstrappingKeyDigest() = 0;
@@ -27,11 +28,11 @@ public:
    * stores the key pair for later use
    * the public key will be sent to the controller to sign
    *
-   * @return return a name component encapsulating the public key bits  
+   * @return return a name component encapsulating the public key bits
    */
   virtual ndn::name::Component
   makeCommunicationKeyPair() = 0;
-  
+
   /**
    * @brief make a name component for the signature of the token
    *
@@ -49,7 +50,7 @@ public:
    */
   int
   run();
-  
+
   /**
    * @brief make the bootstrapping request
    *
@@ -73,8 +74,8 @@ public:
   /**
    * @brief make the certificate request
    *
-   * @params prefix the home prefix received from the bootstrap response 
-   * @params token received from the bootstrap response 
+   * @params prefix the home prefix received from the bootstrap response
+   * @params token received from the bootstrap response
    *
    * name: /[home-prefix]/cert/Hash(BKpub)/{CKpub}/{signature of token2}/{signature by BKpri}
    */
@@ -97,8 +98,7 @@ protected:
 
   virtual bool
   verifyData(const ndn::Data& data, const ndn::Block& certificate);
-  
+
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;
 };
-
