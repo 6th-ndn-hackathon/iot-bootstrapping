@@ -1,4 +1,5 @@
 #include "device.hpp"
+#include <logger.hpp>
 #include <ndn-cxx/util/random.hpp>
 #include <ndn-cxx/security/v2/certificate.hpp>
 #include <ndn-cxx/security/verification-helpers.hpp>
@@ -9,8 +10,8 @@ using namespace ndn;
 int
 Device::run()
 {
-  std::cout << "start the device site!" << std::endl;
-
+  LOG_INFO("device site starts");
+  
   expressBootstrappingRequest();
 
   m_face.processEvents();
@@ -21,13 +22,16 @@ void
 Device::expressBootstrappingRequest()
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    std::cout << "received Nack with reason " << nack.getReason() << std::endl;
+    LOG_FAILURE("received Nack with reason ", nack.getReason());    
   };
 
-  m_face.expressInterest(makeBootstrappingRequest(),
-                         bind(&Device::onBootstrappingResponse, this, _2),
-                         onNack,
-                         bind(&Device::expressBootstrappingRequest, this));
+  auto request = makeBootstrappingRequest();
+  m_face.expressInterest(request,
+			 bind(&Device::onBootstrappingResponse, this, _2),
+			 onNack,
+			 bind(&Device::expressBootstrappingRequest, this));
+
+  LOG_INTEREST_OUT(request);
 }
 
 ndn::Interest
@@ -49,14 +53,14 @@ void
 Device::onBootstrappingResponse(const ndn::Data& data)
 {
   // data: {controller's public key, token}
-  std::cout << " >> D: " << data << std::endl;
+  LOG_DATA_IN(data);
 
   auto content = data.getContent();
   try {
     content.parse();
   }
   catch (const tlv::Error& e) {
-    std::cout << "bootstrapping request, Can not parse the response" << std::endl;
+    LOG_FAILURE("sign-on", "bootstrapping request, Can not parse the response");
     return;
   }
 
@@ -70,7 +74,7 @@ Device::onBootstrappingResponse(const ndn::Data& data)
     expressCertificateRequest(m_anchor.getIdentity(), token);
   }
   else {
-    std::cout << "can not verify the signature of the sign-on response" << std::endl;
+    LOG_FAILURE("sign-on", "can not verify the signature of the sign-on response");
   }
 }
 
@@ -78,13 +82,16 @@ void
 Device::expressCertificateRequest(const ndn::Name& prefix, const uint64_t& token)
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    std::cout << "received Nack with reason " << nack.getReason() << std::endl;
+    LOG_FAILURE("certificate", "received Nack with reason " << nack.getReason());    
   };
 
-  m_face.expressInterest(makeCertificateRequest(prefix, token),
-                         bind(&Device::onCertificateResponse, this, _2),
-                         onNack,
-                         bind(&Device::expressCertificateRequest, this, prefix, token));
+  auto request = makeCertificateRequest(prefix, token);
+  m_face.expressInterest(request,
+			 bind(&Device::onCertificateResponse, this, _2),
+			 onNack,
+			 bind(&Device::expressCertificateRequest, this, prefix, token));
+
+  LOG_INTEREST_OUT(request);
 }
 
 ndn::Interest
@@ -107,7 +114,7 @@ Device::makeCertificateRequest(const Name& prefix, const uint64_t& token)
 void
 Device::onCertificateResponse(const ndn::Data& data)
 {
-  std::cout << " >> D: " << data << std::endl;
+  LOG_DATA_IN(data);
   // TODO-2: zhiyi, please verify the data, the certificate and install the certificate here.
 
   verifyData(data, m_anchor);

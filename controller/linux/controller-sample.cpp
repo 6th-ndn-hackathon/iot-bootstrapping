@@ -4,6 +4,7 @@
 #include <ndn-cxx/security/pib/identity.hpp>
 #include <map>
 #include <iostream>
+#include <logger.hpp>
 using namespace ndn;
 
 namespace std
@@ -68,7 +69,7 @@ Controller::getDefaultCertificate()
 void
 Controller::onBootstrappingRequest(const Interest& request)
 {
-  std::cout << " << I: " << request << std::endl;
+  LOG_INTEREST_IN(request);
 
   // TODO-2: zhiyi, please verify the signature here
 
@@ -104,12 +105,14 @@ Controller::onBootstrappingRequest(const Interest& request)
   data.setContent(content);
   m_keyChain.sign(data); // sign by controller's private key
   m_face.put(data);
+
+  LOG_DATA_OUT(data);
 }
 
 void
 Controller::onCertificateRequest(const Interest& request)
 {
-  std::cout << " << I: " << request << std::endl;
+  LOG_INTEREST_IN(request);
 
   // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
   auto name = request.getName();
@@ -146,6 +149,8 @@ Controller::onCertificateRequest(const Interest& request)
   data.setContent(newCert.wireEncode());
   m_keyChain.sign(data); // sign by controller's private key
   m_face.put(data);
+
+  LOG_DATA_OUT(data);
 }
 
 int
