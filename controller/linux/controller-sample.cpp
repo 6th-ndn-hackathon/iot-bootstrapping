@@ -4,6 +4,7 @@
 #include <ndn-cxx/security/pib/identity.hpp>
 #include <ndn-cxx/util/io.hpp>
 #include <ndn-cxx/util/sha256.hpp>
+#include <ndn-cxx/security/signing-helpers.hpp>
 #include <map>
 #include <iostream>
 #include <logger.hpp>
@@ -41,6 +42,7 @@ private:
   security::Identity m_identity;
 
   security::v2::Certificate m_deviceCert;
+  security::v2::Certificate m_anchorCert;
 
   struct DeviceInfo {
     int BKpub; // TODO-1: Edward, this should be loaded from the QR code; zhiyi, please specify the correct formate here
@@ -97,13 +99,13 @@ Controller::onBootstrappingRequest(const Interest& request)
   auto BKpub = devIt->second.BKpub;
   // TODO-3: zhiyi, please verify the hash of BKpub here
 
-  auto anchorCert = getDefaultCertificate();// controller's public key
+  m_anchorCert = getDefaultCertificate();// controller's public key
   auto token = random::generateWord64();
   devIt->second.token = token;
 
   // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
   auto content = makeEmptyBlock(tlv::Content);
-  content.push_back(anchorCert.wireEncode());
+  content.push_back(m_anchorCert.wireEncode());
   content.push_back(makeNonNegativeIntegerBlock(129, token));
 
   std::cout << "before get key" << std::endl;
@@ -124,7 +126,7 @@ Controller::onBootstrappingRequest(const Interest& request)
 
   Data data(Name(name).appendVersion());
   data.setContent(content);
-  m_keyChain.sign(data); // sign by controller's private key
+  m_keyChain.sign(data, signingByCertificate(m_anchorCert)); // sign by controller's private key
   m_face.put(data);
 
   LOG_DATA_OUT(data);
@@ -164,11 +166,11 @@ Controller::onCertificateRequest(const Interest& request)
   signatureInfo.setValidityPeriod(period);
   security::SigningInfo signingInfo(security::SigningInfo::SIGNER_TYPE_ID,
                                     m_homePrefix, signatureInfo);
-  m_keyChain.sign(newCert);
+  m_keyChain.sign(newCert, signingByCertificate(m_anchorCert));
 
   Data data(Name(name).appendVersion());
   data.setContent(newCert.wireEncode());
-  m_keyChain.sign(data); // sign by controller's private key
+  m_keyChain.sign(data, signingByCertificate(m_anchorCert)); // sign by controller's private key
   m_face.put(data);
 
   LOG_DATA_OUT(data);

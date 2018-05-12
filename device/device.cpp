@@ -69,7 +69,7 @@ Device::onBootstrappingResponse(const ndn::Data& data)
   auto hash = readString(content.get(130));
 
   if (!verifyHash(hash)) {
-    std::cout << "can not verify the signature of the sign-on response" << std::endl;
+    std::cout << "can not verify the hash value of the sign-on response" << std::endl;
     return;
   }
 
