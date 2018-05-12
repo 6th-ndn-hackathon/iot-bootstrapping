@@ -30,7 +30,7 @@ public:
 
 protected:
   security::v2::Certificate getDefaultCertificate();
-  
+
 private:
   Name m_homePrefix;
   Face m_face;
@@ -43,7 +43,7 @@ private:
   };
   typedef std::map<Name::Component, struct DeviceInfo> DeviceList;
   typedef DeviceList::iterator DeviceIt;
-  
+
   DeviceList devices;
 };
 
@@ -71,15 +71,16 @@ Controller::onBootstrappingRequest(const Interest& request)
   std::cout << " << I: " << request << std::endl;
 
   // TODO-2: zhiyi, please verify the signature here
-  
+
   // /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
+
   auto name = request.getName();
   auto BKpubHash = name.at(2);
 
   // TODO-0: currently, we do not have the QR code scanned yet
   DeviceInfo devInfo;
   devices.insert(DeviceList::value_type(BKpubHash, devInfo));
-    
+
   DeviceIt devIt = devices.find(BKpubHash);
   if (devIt == devices.end()) {
     std::cout << "hasn't scanned the QR code yet" << std::endl;
@@ -128,12 +129,21 @@ Controller::onCertificateRequest(const Interest& request)
   Name deviceName(m_homePrefix);
   deviceName.append(BKpubHash);
 
-  // TODO-6: zhiyi, please generate the device certificate here
+  security::v2::Certificate certRequest(CKpub);
   security::v2::Certificate newCert;
 
+  newCert.setName(certRequest.getKeyName().append("NDNCERT-IOT").appendVersion());
+  newCert.setContent(certRequest.getContent());
+  SignatureInfo signatureInfo;
+  security::ValidityPeriod period(time::system_clock::now(),
+                                  time::system_clock::now() + time::days(10));
+  signatureInfo.setValidityPeriod(period);
+  security::SigningInfo signingInfo(security::SigningInfo::SIGNER_TYPE_ID,
+                                    m_homePrefix, signatureInfo);
+  m_keyChain.sign(newCert);
+
   Data data(Name(name).appendVersion());
-  auto content = makeEmptyBlock(tlv::Content);
-  data.setContent(content);
+  data.setContent(newCert.wireEncode());
   m_keyChain.sign(data); // sign by controller's private key
   m_face.put(data);
 }
@@ -143,7 +153,7 @@ Controller::run()
 {
   auto bootstrapPrefix = Name("/ndn/sign-on");
   auto certPrefix = Name(m_homePrefix).append("cert");
-  
+
   m_face.setInterestFilter(bootstrapPrefix,
 			   bind(&Controller::onBootstrappingRequest, this, _2),
 			   bind(&Controller::onRegisterFailure, this, _1, _2));
@@ -151,7 +161,7 @@ Controller::run()
   m_face.setInterestFilter(certPrefix,
 			   bind(&Controller::onCertificateRequest, this, _2),
 			   bind(&Controller::onRegisterFailure, this, _1, _2));
-  
+
   m_face.processEvents();
   return 0;
 }

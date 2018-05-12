@@ -27,11 +27,12 @@ public:
    *
    * stores the key pair for later use
    * the public key will be sent to the controller to sign
+   * @param identity prefix
    *
    * @return return a name component encapsulating the public key bits
    */
   virtual ndn::name::Component
-  makeCommunicationKeyPair() = 0;
+  makeCommunicationKeyPair(const ndn::Name& prefix) = 0;
 
   /**
    * @brief make a name component for the signature of the token

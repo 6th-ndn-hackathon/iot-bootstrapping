@@ -9,7 +9,7 @@ int
 Device::run()
 {
   std::cout << "start the device site!" << std::endl;
-  
+
   expressBootstrappingRequest();
 
   m_face.processEvents();
@@ -20,13 +20,13 @@ void
 Device::expressBootstrappingRequest()
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    std::cout << "received Nack with reason " << nack.getReason() << std::endl;    
+    std::cout << "received Nack with reason " << nack.getReason() << std::endl;
   };
-  
+
   m_face.expressInterest(makeBootstrappingRequest(),
-			 bind(&Device::onBootstrappingResponse, this, _2),
-			 onNack,
-			 bind(&Device::expressBootstrappingRequest, this));
+                         bind(&Device::onBootstrappingResponse, this, _2),
+                         onNack,
+                         bind(&Device::expressBootstrappingRequest, this));
 }
 
 ndn::Interest
@@ -34,6 +34,8 @@ Device::makeBootstrappingRequest()
 {
   // /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
   auto name = Name("/ndn/sign-on").append(makeBootstrappingKeyDigest());
+
+  std::cerr << "first interest name: " << name << std::endl;;
 
   auto request = Interest(name, 2_s);
   request.setMustBeFresh(true);
@@ -75,13 +77,13 @@ void
 Device::expressCertificateRequest(const ndn::Name& prefix, const uint64_t& token)
 {
   auto onNack = [] (const Interest& interest, const lp::Nack& nack) {
-    std::cout << "received Nack with reason " << nack.getReason() << std::endl;    
+    std::cout << "received Nack with reason " << nack.getReason() << std::endl;
   };
-  
+
   m_face.expressInterest(makeCertificateRequest(prefix, token),
-			 bind(&Device::onCertificateResponse, this, _2),
-			 onNack,
-			 bind(&Device::expressCertificateRequest, this, prefix, token));  
+                         bind(&Device::onCertificateResponse, this, _2),
+                         onNack,
+                         bind(&Device::expressCertificateRequest, this, prefix, token));
 }
 
 ndn::Interest
@@ -91,7 +93,7 @@ Device::makeCertificateRequest(const Name& prefix, const uint64_t& token)
   auto name = prefix;
   name.append("cert")
       .append(makeBootstrappingKeyDigest())
-      .append(makeCommunicationKeyPair())
+      .append(makeCommunicationKeyPair(prefix))
       .append(makeTokenSignature(token));
 
   auto request = Interest(name);
@@ -106,6 +108,11 @@ Device::onCertificateResponse(const ndn::Data& data)
 {
   std::cout << " >> D: " << data << std::endl;
   // TODO-2: zhiyi, please verify the data, the certificate and install the certificate here.
+  ndn::security::v2::Certificate cert(data.getContent().blockFromValue());
+  auto& pib = m_keyChain.getPib();
+  ndn::security::Identity id = pib.getIdentity(cert.getIdentity());
+  ndn::security::Key key = id.getKey(cert.getKeyName());
+  m_keyChain.addCertificate(key, cert);
 }
 
 void

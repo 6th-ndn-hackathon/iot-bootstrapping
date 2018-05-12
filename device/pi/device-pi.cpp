@@ -28,10 +28,11 @@ DevicePi::importBootstrappingKey(const char* path)
   }
 
   Data certData = safeBag->getCertificate();
-  m_cert = ndn::security::v2::Certificate(std::move(certData));
-  Name identity = m_cert.getIdentity();
-  Name keyName = m_cert.getKeyName();
+  m_bootstrappingCert = ndn::security::v2::Certificate(std::move(certData));
+  Name identity =  m_bootstrappingCert.getIdentity();
+  Name keyName =  m_bootstrappingCert.getKeyName();
 
+  std::cout << "key name from safebag: " << keyName << std::endl;
   // load public key
   const Buffer publicKeyBits = m_cert.getPublicKey();
   m_pub.loadPkcs8(publicKeyBits.data(), publicKeyBits.size());
@@ -48,16 +49,19 @@ DevicePi::makeBootstrappingKeyDigest()
   ndn::util::Sha256 digest;
   digest.update(publicKeyBits.data(), publicKeyBits.size());
   digest.computeDigest();
-  std::string digestStr = digest.toString();
-  Name tmpName(digestStr.substr(0, 25));
+  Name tmpName(digest.toString());
   return tmpName.at(0);
 }
 
 name::Component
-DevicePi::makeCommunicationKeyPair()
+DevicePi::makeCommunicationKeyPair(const Name& prefix)
 {
-  // TODO: zhiyi
-  return name::Component("CKpub");
+  EcKeyParams params;
+  Name identityName = prefix;
+  identityName.append(makeBootstrappingKeyDigest());
+  auto identity = m_keyChain.createIdentity(identityName, params);
+  auto cert = identity.getDefaultKey().getDefaultCertificate();
+  return name::Component(cert.wireEncode());
 }
 
 name::Component

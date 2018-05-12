@@ -22,7 +22,7 @@ DeviceAr::makeBootstrappingKeyDigest()
 }
 
 name::Component
-DeviceAr::makeCommunicationKeyPair()
+DeviceAr::makeCommunicationKeyPair(const Name& prefix)
 {
   // TODO: zhiyi, edward
   return name::Component("CKpub");
@@ -34,5 +34,3 @@ DeviceAr::makeTokenSignature(const uint64_t& token)
   // TODO: zhiyi, edward
   return name::Component("CKpri(token)");
 }
-
-

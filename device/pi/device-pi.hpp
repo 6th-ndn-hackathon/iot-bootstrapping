@@ -15,7 +15,7 @@ public:
   makeBootstrappingKeyDigest();
 
   virtual ndn::name::Component
-  makeCommunicationKeyPair();
+  makeCommunicationKeyPair(const ndn::Name& prefix);
 
   virtual ndn::name::Component
   makeTokenSignature(const uint64_t& token);
