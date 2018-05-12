@@ -8,10 +8,11 @@
 
 using namespace ndn;
 
-DevicePi::DevicePi(const Name& BKName)
+DevicePi::DevicePi(const char* BKfile, const Name& BKName)
   : m_bkName(BKName)
 {
   std::cout << "Pi is being constructed" << std::endl;
+  importBootstrappingKey(BKfile);
 }
 
 void
@@ -27,12 +28,12 @@ DevicePi::importBootstrappingKey(const char* path)
   }
 
   Data certData = safeBag->getCertificate();
-   m_bootstrappingCert = ndn::security::v2::Certificate(std::move(certData));
-  Name identity =  m_bootstrappingCert.getIdentity();
-  Name keyName =  m_bootstrappingCert.getKeyName();
+  m_cert = ndn::security::v2::Certificate(std::move(certData));
+  Name identity = m_cert.getIdentity();
+  Name keyName = m_cert.getKeyName();
 
   // load public key
-  const Buffer publicKeyBits =  m_bootstrappingCert.getPublicKey();
+  const Buffer publicKeyBits = m_cert.getPublicKey();
   m_pub.loadPkcs8(publicKeyBits.data(), publicKeyBits.size());
 
   // load private key
@@ -43,7 +44,7 @@ DevicePi::importBootstrappingKey(const char* path)
 name::Component
 DevicePi::makeBootstrappingKeyDigest()
 {
-  const Buffer publicKeyBits = m_bootstrappingCert.getPublicKey();
+  const Buffer publicKeyBits = m_cert.getPublicKey();
   ndn::util::Sha256 digest;
   digest.update(publicKeyBits.data(), publicKeyBits.size());
   digest.computeDigest();
@@ -55,11 +56,8 @@ DevicePi::makeBootstrappingKeyDigest()
 name::Component
 DevicePi::makeCommunicationKeyPair()
 {
-  EcKeyParams params;
-  this->m_certPrv = ndn::security::transform::generatePrivateKey(params);
-  auto publicKey = m_certPrv->derivePublicKey();
-  Block pubValue(666, publicKey);
-  return name::Component(pubValue);
+  // TODO: zhiyi
+  return name::Component("CKpub");
 }
 
 name::Component

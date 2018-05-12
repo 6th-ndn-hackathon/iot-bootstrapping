@@ -5,7 +5,7 @@
 class DevicePi : public Device
 {
 public:
-  DevicePi(const ndn::Name& BKName = "iot-pi");
+  DevicePi(const char* BKfile, const ndn::Name& BKName = "iot-pi");
 
 public:
   virtual void
@@ -22,9 +22,7 @@ public:
 
 private:
   ndn::Name m_bkName;
-  ndn::security::v2::Certificate m_bootstrappingCert;
+  ndn::security::v2::Certificate m_cert;
   ndn::security::transform::PrivateKey m_prv;
   ndn::security::transform::PublicKey m_pub;
-  std::unique_ptr<ndn::security::transform::PrivateKey> m_certPrv;
-  ndn::security::v2::Certificate m_cert;
 };
