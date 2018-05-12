@@ -3,6 +3,7 @@
 #include <ndn-cxx/util/sha256.hpp>
 #include <ndn-cxx/security/transform/signer-filter.hpp>
 #include <ndn-cxx/security/transform/buffer-source.hpp>
+#include <ndn-cxx/security/signing-helpers.hpp>
 #include <ndn-cxx/security/transform/stream-sink.hpp>
 #include <iostream>
 
@@ -90,4 +91,11 @@ DevicePi::verifyHash(const std::string& hash)
     return true;
 
   return false;
+}
+
+
+void
+DevicePi::signRequest(ndn::Interest& request)
+{
+  m_keyChain.sign(request, signingByCertificate(m_bootstrappingCert));
 }

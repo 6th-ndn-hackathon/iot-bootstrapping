@@ -5,6 +5,7 @@
 #include <ndn-cxx/util/io.hpp>
 #include <ndn-cxx/util/sha256.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
+#include <ndn-cxx/security/verification-helpers.hpp>
 #include <map>
 #include <iostream>
 #include <logger.hpp>
@@ -60,6 +61,8 @@ Controller::Controller(const Name& prefix, const std::string& filename)
 {
   m_deviceCert = *(io::load<ndn::security::v2::Certificate>(filename));
   std::cout << m_deviceCert.getName() << std::endl;
+
+  m_anchorCert = getDefaultCertificate();// controller's public key
 }
 
 void
@@ -79,9 +82,12 @@ Controller::onBootstrappingRequest(const Interest& request)
 {
   LOG_INTEREST_IN(request);
 
-  // TODO-2: zhiyi, please verify the signature here
-
   // /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
+
+  if (!ndn::security::verifySignature(request, m_deviceCert)) {
+    std::cerr << "cannot verify the first Interest's signature, return" << std::endl;
+    return;
+  }
 
   auto name = request.getName();
   auto BKpubHash = name.at(2);
@@ -99,22 +105,16 @@ Controller::onBootstrappingRequest(const Interest& request)
   auto BKpub = devIt->second.BKpub;
   // TODO-3: zhiyi, please verify the hash of BKpub here
 
-  m_anchorCert = getDefaultCertificate();// controller's public key
   auto token = random::generateWord64();
   devIt->second.token = token;
 
-  // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
   auto content = makeEmptyBlock(tlv::Content);
   content.push_back(m_anchorCert.wireEncode());
   content.push_back(makeNonNegativeIntegerBlock(129, token));
 
-  std::cout << "before get key" << std::endl;
-
   auto pubKey = m_deviceCert.getPublicKey();
   auto pubKey2 = m_deviceCert.getPublicKey();
   pubKey.insert(pubKey.end(), pubKey2.begin(), pubKey2.end());
-
-  std::cout << "before digest" << std::endl;
 
   ndn::util::Sha256 digest;
   digest.update(pubKey.data(), pubKey.size());
@@ -136,6 +136,11 @@ void
 Controller::onCertificateRequest(const Interest& request)
 {
   LOG_INTEREST_IN(request);
+
+  if (!ndn::security::verifySignature(request, m_deviceCert)) {
+    std::cerr << "cannot very signon signature, return" << std::endl;
+    return;
+  }
 
   // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
   auto name = request.getName();
@@ -183,12 +188,12 @@ Controller::run()
   auto certPrefix = Name(m_homePrefix).append("cert");
 
   m_face.setInterestFilter(bootstrapPrefix,
-			   bind(&Controller::onBootstrappingRequest, this, _2),
-			   bind(&Controller::onRegisterFailure, this, _1, _2));
+                           bind(&Controller::onBootstrappingRequest, this, _2),
+                           bind(&Controller::onRegisterFailure, this, _1, _2));
 
   m_face.setInterestFilter(certPrefix,
-			   bind(&Controller::onCertificateRequest, this, _2),
-			   bind(&Controller::onRegisterFailure, this, _1, _2));
+                           bind(&Controller::onCertificateRequest, this, _2),
+                           bind(&Controller::onRegisterFailure, this, _1, _2));
 
   m_face.processEvents();
   return 0;

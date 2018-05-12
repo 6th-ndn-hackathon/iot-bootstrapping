@@ -23,6 +23,9 @@ public:
   virtual bool
   verifyHash(const std::string& hash);
 
+  virtual void
+  signRequest(ndn::Interest& request);
+
 private:
   ndn::Name m_bkName;
   ndn::security::v2::Certificate m_bootstrappingCert;
