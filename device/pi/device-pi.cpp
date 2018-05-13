@@ -41,6 +41,14 @@ DevicePi::importBootstrappingKey(const char* path)
   // load private key
   m_prv.loadPkcs8(safeBag->getEncryptedKeyBag().data(), safeBag->getEncryptedKeyBag().size(),
                   importPassword.c_str(), importPassword.size());
+
+  // add safebag to the keychain
+  try {
+    m_keyChain.importSafeBag(*safeBag, importPassword.c_str(), importPassword.size());
+  }
+  catch (const std::exception& e) {
+    return;
+  }
 }
 
 name::Component
