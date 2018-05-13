@@ -57,8 +57,18 @@ private:
 
 Controller::Controller(const Name& prefix, const std::string& filename)
   : m_homePrefix(prefix)
-  , m_identity(m_keyChain.createIdentity(m_homePrefix))
 {
+
+  try {
+    m_identity = m_keyChain.createIdentity(m_homePrefix);
+  }
+  catch (const std::exception& e) {
+    const auto& pib = m_keyChain.getPib();
+    m_identity = pib.getIdentity(m_homePrefix);
+  }
+
+  std::cout << "before load" << std::endl;
+
   m_deviceCert = *(io::load<ndn::security::v2::Certificate>(filename));
   std::cout << m_deviceCert.getName() << std::endl;
 
@@ -201,6 +211,7 @@ Controller::run()
 
 int main(int argc, char** argv)
 {
-  Controller controller("/ucla/eiv396", "/Users/ZhangZhiyi/Develop/ndn-iot-device-signon/controller/linux/pi-pub.key");
+  std::cout << "test" << std::endl;
+  Controller controller("/ucla/eiv396", "/Users/ZhangZhiyi/Develop/iot-bootstrapping/controller/linux/pi-pub.key");
   return controller.run();
 }
