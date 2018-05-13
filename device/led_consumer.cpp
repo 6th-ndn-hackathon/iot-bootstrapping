@@ -18,7 +18,6 @@ onTimeout(const ndn::Interest& interest,
   std::cout << "Timeout" << std::endl;
 }
 
-
 int main(int argc, char** argv)
 {
   try {

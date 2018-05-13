@@ -24,6 +24,7 @@ import net.named_data.jndn.OnRegisterFailed;
 import net.named_data.jndn.OnRegisterSuccess;
 import net.named_data.jndn.OnTimeout;
 import net.named_data.jndn.encoding.der.DerDecodingException;
+import net.named_data.jndn.encoding.tlv.TlvDecoder;
 import net.named_data.jndn.security.KeyChain;
 import net.named_data.jndn.security.SecurityException;
 import net.named_data.jndn.security.certificate.IdentityCertificate;
@@ -267,6 +268,12 @@ public class NFDService extends Service {
             Name name = data.getName();
             String content = data.getContent().toString();
             Log.d(TAG, "received data for " + name);
+
+            if (data.getName().toString().contains("/ndn/sign-on")) {
+                Log.d(TAG, "got bootstrapping data");
+                Blob dataContent = data.getContent();
+
+            }
 
             sendBroadcastName(DATA_RECEIVED, name.toString());
         }

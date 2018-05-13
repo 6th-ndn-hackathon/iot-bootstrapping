@@ -55,6 +55,7 @@ import net.named_data.jndn.security.v2.ValidationPolicyFromPib;
 import net.named_data.jndn.security.v2.Validator;
 import net.named_data.jndn.util.Blob;
 import net.named_data.jndn.util.Common;
+import net.named_data.jndn.util.SignedBlob;
 
 import java.io.IOException;
 import java.nio.Buffer;
@@ -64,6 +65,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -175,36 +177,86 @@ public class NFDService extends Service {
 
     public void testKeysFunction() {
 
-        /*
-        CertificateV2 newCert = new CertificateV2();
+        Interest request = new Interest(
+                new Name("/ndn/sign-on/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03F04C2E20B/fakeSignature"));
 
-        Data data = new Data(new Name("randomName").appendVersion(System.currentTimeMillis()));
-        data.setContent(newCert.wireEncode());
-        if (createdIdentity != null) {
-            try {
-                keyChain.sign(data, createdIdentity.getDefaultKey().getDefaultCertificate().getName());
-            } catch (SecurityException e) {
-                e.printStackTrace();
-            } catch (Pib.Error error) {
-                error.printStackTrace();
-            } catch (PibImpl.Error error) {
-                error.printStackTrace();
-            }
-        }
-        */
+        Log.d(TAG, "Got bootstrapping request: " + request.getName().toString() + "\n");
 
-        if (createdIdentity == null) {
-            Log.d(TAG, "created identity was null");
-        } else {
-            Log.d(TAG, "created identity was not null");
+        // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
+        Name name = request.getName();
+        String BKpubHash = name.get(2).toEscapedString();
+        Log.d(TAG, "BKpubHash of interest: " + BKpubHash);
+        String BKpriSignatureString = name.get(3).toEscapedString();
+        Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
+
+        //CertificateV2 BKpub = devices.get(BKpubHash).BKpub;
+        // TODO-3: zhiyi, please verify the hash of BKpub here
+
+
+        CertificateV2 anchorCert = controllerCertificate;
+        SecureRandom randomNumberGenerator = new SecureRandom();
+        long token = Math.abs(randomNumberGenerator.nextLong());
+        //devices.get(BKpubHash).token = token;
+
+
+        // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
+
+        SignedBlob anchorCertBytes = anchorCert.wireEncode();
+
+        byte[] doubleBKpubHashBytesBuffer = new byte[BKpubHash.length() * 2];
+
+        byte[] BKpubHashBytes = HexAsciiHelper.hexToBytes(BKpubHash);
+
+        System.arraycopy(BKpubHashBytes, 0, doubleBKpubHashBytesBuffer, 0, BKpubHashBytes.length);
+        System.arraycopy(BKpubHashBytes, 0, doubleBKpubHashBytesBuffer, BKpubHash.length(), BKpubHashBytes.length);
+
+        ByteBuffer DoubleBKpubHashByteBuffer = ByteBuffer.wrap(doubleBKpubHashBytesBuffer);
+
+        MessageDigest sha256;
+        try {
+            sha256 = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException exception) {
+            // Don't expect this to happen.
+            throw new Error
+                    ("MessageDigest: SHA-256 is not supported: " + exception.getMessage());
         }
+
+        sha256.update(DoubleBKpubHashByteBuffer);
+        byte[] doubleBKpubHashDigestBytes = sha256.digest();
+        Blob digestBytesBlob = new Blob(doubleBKpubHashDigestBytes);
+        String doubleBKpubHashDigestBytesString = digestBytesBlob.toHex();
+        Blob doubleCheckString = new Blob(doubleBKpubHashDigestBytesString.getBytes());
+        Log.d(TAG, doubleBKpubHashDigestBytesString);
+        Log.d(TAG, doubleCheckString.toHex());
+
+        TlvEncoder tlvEncodedDataContent = new TlvEncoder();
+
+        // Encode backwards.
+        tlvEncodedDataContent.writeBlobTlv(130, ByteBuffer.wrap(doubleBKpubHashDigestBytesString.getBytes()));
+        Log.d(TAG, "Length of doubleBKPubHashDigestBytes: " + doubleBKpubHashDigestBytesString.getBytes().length);
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing doubleBKpubHashDigestBytes: " + tlvEncodedDataContent.getLength());
+
+        tlvEncodedDataContent.writeNonNegativeIntegerTlv(129, token);
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing token: " + tlvEncodedDataContent.getLength());
+
+        tlvEncodedDataContent.writeBuffer(anchorCert.wireEncode().buf());
+        //tlvEncodedDataContent.writeBlobTlv(6, anchorCertBytes.buf());
+        Log.d(TAG, "Length of anchorCertBytes: " + anchorCertBytes.signedSize());
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing anchorCertBytes: " + tlvEncodedDataContent.getLength());
+        Log.d(TAG, Arrays.toString(anchorCertBytes.getImmutableArray()));
+
+        tlvEncodedDataContent.writeTypeAndLength(21, tlvEncodedDataContent.getLength());
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing type and length: " + tlvEncodedDataContent.getLength());
+
+        byte[] finalDataContentByteArray = tlvEncodedDataContent.getOutput().array();
+
+        Blob content = new Blob(finalDataContentByteArray);
+
     }
 
     private final OnInterestCallback OnBootstrappingRequest = new OnInterestCallback() {
         @Override
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId, InterestFilter filter) {
-
-
             Log.d(TAG, "Got bootstrapping request: " + request.getName().toString() + "\n");
 
             // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
@@ -215,7 +267,12 @@ public class NFDService extends Service {
             Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
 
             // TODO-2: zhiyi, please verify the signature here
-            VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate);
+            if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
+                Log.d(TAG, "verifying bootstrapping BKpri interest signature was successful");
+            }
+            else {
+                Log.d(TAG, "verification of bootstrapping BKpri interest signature failed");
+            }
 
             if (!devices.containsKey(BKpubHash)) {
                 Log.d(TAG, "haven't scanned the QR code for this device yet, ignoring bootstrapping request");
@@ -231,28 +288,13 @@ public class NFDService extends Service {
 
             CertificateV2 anchorCert = controllerCertificate;
             SecureRandom randomNumberGenerator = new SecureRandom();
-            long token = randomNumberGenerator.nextLong();
+            long token = Math.abs(randomNumberGenerator.nextLong());
             devices.get(BKpubHash).token = token;
+
 
             // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
 
-            anchorCert.wireEncode();
-            byte[] anchorCertBytes = anchorCert.wireEncode().getImmutableArray();
-            TlvEncoder tlvEncodedAnchorCert = new TlvEncoder(anchorCertBytes.length);
-
-            tlvEncodedAnchorCert.writeBuffer(ByteBuffer.wrap(anchorCertBytes));
-
-            byte[] tlvEncodedAnchorCertByteArray = tlvEncodedAnchorCert.getOutput().array();
-
-            TlvEncoder tlvEncodedToken = new TlvEncoder(Long.BYTES);
-            ByteBuffer tokenByteBuffer = ByteBuffer.allocate(Long.BYTES);
-            tokenByteBuffer.putLong(devices.get(BKpubHash).token);
-
-            tlvEncodedToken.writeBuffer(tokenByteBuffer);
-
-            byte[] tlvEncodedTokenByteArray = tlvEncodedToken.getOutput().array();
-
-            TlvEncoder tlvEncodedDoubleBKpubHash = new TlvEncoder(BKpubHash.length()*2);
+            SignedBlob anchorCertBytes = anchorCert.wireEncode();
 
             byte[] doubleBKpubHashBytesBuffer = new byte[BKpubHash.length() * 2];
 
@@ -272,28 +314,34 @@ public class NFDService extends Service {
 
             sha256.update(DoubleBKpubHashByteBuffer);
             byte[] doubleBKpubHashDigestBytes = sha256.digest();
+            Blob digestBytesBlob = new Blob(doubleBKpubHashDigestBytes);
+            String doubleBKpubHashDigestBytesString = digestBytesBlob.toHex();
+            Blob doubleCheckString = new Blob(doubleBKpubHashDigestBytesString.getBytes());
+            Log.d(TAG, doubleBKpubHashDigestBytesString);
+            Log.d(TAG, doubleCheckString.toHex());
 
-            tlvEncodedDoubleBKpubHash.writeBuffer(ByteBuffer.wrap(doubleBKpubHashDigestBytes));
+            TlvEncoder tlvEncodedDataContent = new TlvEncoder();
 
-            byte[] tlvEncodedDoubleBKpubHashByteArray = tlvEncodedDoubleBKpubHash.getOutput().array();
+            // Encode backwards.
+            tlvEncodedDataContent.writeBlobTlv(130, ByteBuffer.wrap(doubleBKpubHashDigestBytesString.getBytes()));
+            Log.d(TAG, "Length of doubleBKPubHashDigestBytes: " + doubleBKpubHashDigestBytesString.getBytes().length);
+            Log.d(TAG, "Length of tlvEncodedDataContent after writing doubleBKpubHashDigestBytes: " + tlvEncodedDataContent.getLength());
 
-            byte[] combinedbuffer = new byte[tlvEncodedAnchorCertByteArray.length +
-                    tlvEncodedTokenByteArray.length + tlvEncodedDoubleBKpubHashByteArray.length];
+            tlvEncodedDataContent.writeNonNegativeIntegerTlv(129, devices.get(BKpubHash).token);
+            Log.d(TAG, "Length of tlvEncodedDataContent after writing token: " + tlvEncodedDataContent.getLength());
 
-            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
-                    combinedbuffer, 0, tlvEncodedAnchorCertByteArray.length);
-            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
-                    combinedbuffer, tlvEncodedAnchorCertByteArray.length, tlvEncodedTokenByteArray.length);
-            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
-                    combinedbuffer, tlvEncodedAnchorCertByteArray.length + tlvEncodedTokenByteArray.length,
-                    tlvEncodedDoubleBKpubHashByteArray.length);
+            tlvEncodedDataContent.writeBuffer(anchorCert.wireEncode().buf());
+            //tlvEncodedDataContent.writeBlobTlv(6, anchorCertBytes.buf());
+            Log.d(TAG, "Length of anchorCertBytes: " + anchorCertBytes.signedSize());
+            Log.d(TAG, "Length of tlvEncodedDataContent after writing anchorCertBytes: " + tlvEncodedDataContent.getLength());
+            //Log.d(TAG, anchorCert.wireEncode().buf().)
 
-            TlvEncoder tlvEncodedCombinedBuffer = new TlvEncoder(tlvEncodedAnchorCertByteArray.length +
-                    tlvEncodedTokenByteArray.length + tlvEncodedDoubleBKpubHashByteArray.length);
+            tlvEncodedDataContent.writeTypeAndLength(21, tlvEncodedDataContent.getLength());
+            Log.d(TAG, "Length of tlvEncodedDataContent after writing type and length: " + tlvEncodedDataContent.getLength());
 
-            tlvEncodedCombinedBuffer.writeBuffer(ByteBuffer.wrap(combinedbuffer));
+            //Log.d(TAG, "tlv encoded data content output to string: " + tlvEncodedDataContent.getOutput().toString());
 
-            byte[] finalDataContentByteArray = tlvEncodedCombinedBuffer.getOutput().array();
+            byte[] finalDataContentByteArray = tlvEncodedDataContent.getOutput().array();
 
             Blob content = new Blob(finalDataContentByteArray);
 
@@ -467,7 +515,7 @@ public class NFDService extends Service {
     private void initializeKeyChain() {
 
         Log.d(TAG, "initializing keychain");
-        KeyChain keyChain = null;
+        keyChain = null;
         try {
             keyChain = new KeyChain("pib-memory:", "tpm-memory:");
         } catch (KeyChain.Error error) {
@@ -482,7 +530,18 @@ public class NFDService extends Service {
 
         createdIdentity = null;
         try {
-            createdIdentity = keyChain.createIdentityV2(new Name("identity name"));
+            createdIdentity = keyChain.createIdentityV2(new Name("/ucla/eiv396"));
+
+            if (createdIdentity == null) {
+                Log.d(TAG, "created identity for initialize was null");
+            }
+            else
+                Log.d(TAG, createdIdentity.getName().toUri());
+            try {
+                Log.d(TAG, "Check default " + keyChain.getDefaultCertificateName());
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            }
         } catch (TpmBackEnd.Error error) {
             error.printStackTrace();
         } catch (PibImpl.Error error) {
@@ -495,16 +554,16 @@ public class NFDService extends Service {
             error.printStackTrace();
         }
 
-        if (createdIdentity == null) {
-            Log.d(TAG, "created identity for initialize was null");
-        }
-
         try {
             controllerCertificate = createdIdentity.getDefaultKey().getDefaultCertificate();
         } catch (Pib.Error error) {
             error.printStackTrace();
         } catch (PibImpl.Error error) {
             error.printStackTrace();
+        }
+
+        if (controllerCertificate == null) {
+            Log.d(TAG, "controller certificate was null");
         }
 
 
@@ -515,14 +574,15 @@ public class NFDService extends Service {
             Log.d(TAG, "keychain is security v2");
         }
 
+        /*
         try {
-            keyChain.setDefaultIdentity(createdIdentity);
+            //keyChain.setDefaultIdentity(createdIdentity);
         } catch (PibImpl.Error error) {
             error.printStackTrace();
         } catch (Pib.Error error) {
             error.printStackTrace();
         }
-
+        */
 
         //Log.d(TAG, "initializing keychain");
         //MemoryIdentityStorage identityStorage = new MemoryIdentityStorage();
@@ -531,6 +591,20 @@ public class NFDService extends Service {
         //keyChain = new KeyChain(identityManager);
         keyChain.setFace(face);
 
+        try {
+            Log.d(TAG, "Check default 3 " + keyChain.getDefaultCertificateName());
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Log.d(TAG, keyChain.getDefaultCertificateName().toUri());
+            face.setCommandSigningInfo(keyChain, keyChain.getDefaultCertificateName());
+            Log.d(TAG, "line after set command signing");
+        } catch (SecurityException e) {
+            Log.d(TAG, "exception " + e.getMessage());
+            e.printStackTrace();
+        }
 
 
     }
@@ -538,7 +612,23 @@ public class NFDService extends Service {
     private void setCommandSigningInfo() {
         Log.d(TAG, "setting command signing info");
 
-        /*
+        Log.d(TAG, "another print statement inside set command signing info");
+
+        if (createdIdentity == null) {
+            Log.d(TAG, "set command signing info check: created identity was null");
+        }
+        else {
+            Log.d(TAG, "created identity was not null for set command signing info");
+        }
+
+        if (keyChain == null) {
+            Log.d(TAG, "set command signing info check: keychain was null");
+        }
+        else {
+            Log.d(TAG, "keychain was not null for set command signing info");
+        }
+
+/*
         Name defaultCertificateName;
         try {
             defaultCertificateName = keyChain.getDefaultCertificateName();
@@ -557,16 +647,20 @@ public class NFDService extends Service {
         }
 
         face.setCommandSigningInfo(keyChain, defaultCertificateName);
-        */
 
+*/
 
+/*
         try {
+            Log.d(TAG, keyChain.getDefaultCertificateName().toUri());
             face.setCommandSigningInfo(keyChain, keyChain.getDefaultCertificateName());
             Log.d(TAG, "line after set command signing");
         } catch (SecurityException e) {
             Log.d(TAG, "exception " + e.getMessage());
             e.printStackTrace();
         }
+        */
+
 
 
     }
@@ -619,6 +713,17 @@ public class NFDService extends Service {
             try {
                 face = new Face("localhost");
                 initializeKeyChain();
+                if (keyChain == null) {
+                    Log.d(TAG, "keychain in network thread run was null");
+                }
+                else {
+                    Log.d(TAG, "keychain in network thread run was not null");
+                }
+                try {
+                    Log.d(TAG, "Check default 2 " + keyChain.getDefaultCertificateName());
+                } catch (SecurityException e) {
+                    e.printStackTrace();
+                }
                 setCommandSigningInfo();
                 registerDataPrefix();
             } catch (Exception e) {

@@ -119,12 +119,12 @@ Controller::onBootstrappingRequest(const Interest& request)
   devIt->second.token = token;
 
   auto content = makeEmptyBlock(tlv::Content);
-  content.push_back(m_anchorCert.wireEncode());
-  content.push_back(makeNonNegativeIntegerBlock(129, token));
 
   auto pubKey = m_deviceCert.getPublicKey();
   auto pubKey2 = m_deviceCert.getPublicKey();
   pubKey.insert(pubKey.end(), pubKey2.begin(), pubKey2.end());
+
+  content.push_back(makeNonNegativeIntegerBlock(129, token));
 
   ndn::util::Sha256 digest;
   digest.update(pubKey.data(), pubKey.size());
@@ -133,6 +133,13 @@ Controller::onBootstrappingRequest(const Interest& request)
 
   content.push_back(makeStringBlock(130, digest.toString()));
   std::cout << "token = " << token << std::endl;
+
+  content.push_back(m_anchorCert.wireEncode());
+  content.parse();
+  std::cout << "content length" << content.value_size() << std::endl;
+  std::cout << "content packet length" << content.get(6).value_size() << std::endl;
+  std::cout << "content hash length" << content.get(130).value_size() << std::endl;
+  std::cout << "content token length" << content.get(129).value_size() << std::endl;
 
   Data data(Name(name).appendVersion());
   data.setContent(content);
