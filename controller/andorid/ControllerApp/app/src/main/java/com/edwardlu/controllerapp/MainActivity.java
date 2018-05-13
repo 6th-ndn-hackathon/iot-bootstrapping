@@ -108,8 +108,6 @@ public class MainActivity extends AppCompatActivity{
             nfdService = ((NFDService.LocalBinder) service).getService();
 
             nfdService.startNetworkThread();
-
-            nfdService.testKeysFunction();
         }
 
         @Override
@@ -158,9 +156,13 @@ public class MainActivity extends AppCompatActivity{
                     Log.d(TAG, "nfd devices was not null");
                 }
 
+                Log.d(TAG, "BKpub keyhash: " + lastBKpubDigest);
+
+
+
                 nfdService.devices.put(MainActivity.lastBKpubDigest, new NFDService.DeviceInfo(MainActivity.lastDeviceCertificate, 0));
 
-                Log.d(TAG, nfdService.devices.get(lastBKpubDigest).BKpub.getIdentity().toString());
+                //Log.d(TAG, nfdService.devices.get(lastBKpubDigest).BKpub.getIdentity().toString());
 
                 if (nfdService == null ) {
                     Log.d(TAG, "nfd service was null");
@@ -168,6 +170,8 @@ public class MainActivity extends AppCompatActivity{
                 if (nfdService.keyChain == null) {
                     Log.d(TAG, "nfd keychain was null");
                 }
+
+                nfdService.testKeysFunction();
             }
         });
 
@@ -245,7 +249,7 @@ public class MainActivity extends AppCompatActivity{
 
                 Log.d(TAG, "digest of public key of certificate scanned from qr code: " + digestString);
 
-                lastBKpubDigest = digestString;
+                lastBKpubDigest = digestString.toUpperCase();
                 lastDeviceCertificate = deviceCertificate;
 
                 sendBroadcast(new Intent(DEVICE_SCANNED));
