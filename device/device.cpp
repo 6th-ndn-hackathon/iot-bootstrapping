@@ -56,15 +56,15 @@ Device::onBootstrappingResponse(const ndn::Data& data)
   LOG_DATA_IN(data);
 
   auto content = data.getContent();
+  std::cout << data << std::endl;
   try {
     content.parse();
   }
   catch (const tlv::Error& e) {
-    LOG_FAILURE("sign-on", "bootstrapping request, Can not parse the response");
+    LOG_FAILURE("sign-on", "bootstrapping request, Can not parse the response " << e.what());
     return;
   }
 
-  m_anchor = security::v2::Certificate(content.get(tlv::Data));
   auto token = readNonNegativeInteger(content.get(129));
   auto hash = readString(content.get(130));
 
@@ -76,6 +76,7 @@ Device::onBootstrappingResponse(const ndn::Data& data)
   std::cout << "token = " << token << std::endl;
   std::cout << "hash = " << hash << std::endl;
 
+  m_anchor = security::v2::Certificate(content.get(tlv::Data));
   if (verifyData(data, m_anchor)) {
     expressCertificateRequest(m_anchor.getIdentity(), token);
   }

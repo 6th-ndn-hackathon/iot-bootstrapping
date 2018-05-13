@@ -1,7 +1,7 @@
 #include "device-pi.hpp"
 #include <string.h>
 
-#define DEFAULT_BKPATH "/Users/ZhangZhiyi/Develop/ndn-iot-device-signon/device/pi/safebag.key"
+#define DEFAULT_BKPATH "/Users/ZhangZhiyi/Develop/iot-bootstrapping/device/pi/safebag.key"
 
 int main(int argc, char** argv)
 {
