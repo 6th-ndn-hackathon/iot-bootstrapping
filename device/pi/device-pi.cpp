@@ -124,7 +124,7 @@ DevicePi::startLEDService()
 {
   // /[home_prefix]/led
   Name serviceName = Name(m_anchor.getIdentity()).append("led");
-  m_face.setInterestFilter(Name("/ucla/eiv396/led"),
+  m_face.setInterestFilter(serviceName,
                            bind(&DevicePi::onLEDCommand, this, _2),
                            bind(&DevicePi::onRegisterFailure, this, _1, _2));
 }
@@ -132,7 +132,7 @@ DevicePi::startLEDService()
 void
 DevicePi::startCertificateService()
 {
-  m_face.setInterestFilter(Name("ucla/eiv396/iot-pi"),//m_deviceCert.getName(),
+  m_face.setInterestFilter(m_deviceCert.getName(),
                            bind(&DevicePi::onCertificateRequest, this, _2),
                            bind(&DevicePi::onRegisterFailure, this, _1, _2));
 }
@@ -154,6 +154,6 @@ DevicePi::onLEDCommand(const Interest& command)
 void
 DevicePi::onCertificateRequest(const ndn::Interest& request)
 {
-  m_face.put(m_deviceCert);
   LOG_INTEREST_IN(request);
+  m_face.put(m_deviceCert);
 }
