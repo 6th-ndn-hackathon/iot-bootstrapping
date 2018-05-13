@@ -72,7 +72,10 @@ DevicePi::makeCommunicationKeyPair(const Name& prefix)
   identityName.append(makeBootstrappingKeyDigest());
   auto identity = m_keyChain.createIdentity(identityName, params);
   auto cert = identity.getDefaultKey().getDefaultCertificate();
-  return name::Component(cert.wireEncode());
+
+  auto block = cert.wireEncode();
+  return name::Component(tlv::Data, block.wire(), block.size());
+  //return name::Component(cert.wireEncode());
 }
 
 name::Component
