@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ControllerApp</string>
+    <string name="bootstrapPrefix">/ndn/sign-on</string>
+    <string name="homePrefix">/ucla/eiv396</string>
+</resources>
