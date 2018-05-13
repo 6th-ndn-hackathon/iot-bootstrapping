@@ -3,15 +3,17 @@
 #include <ndn-cxx/util/sha256.hpp>
 #include <ndn-cxx/security/transform/signer-filter.hpp>
 #include <ndn-cxx/security/transform/buffer-source.hpp>
+#include <ndn-cxx/security/signing-helpers.hpp>
 #include <ndn-cxx/security/transform/stream-sink.hpp>
 #include <iostream>
 
 using namespace ndn;
 
-DevicePi::DevicePi(const Name& BKName)
+DevicePi::DevicePi(const char* BKfile, const Name& BKName)
   : m_bkName(BKName)
 {
   std::cout << "Pi is being constructed" << std::endl;
+  importBootstrappingKey(BKfile);
 }
 
 void
@@ -27,36 +29,48 @@ DevicePi::importBootstrappingKey(const char* path)
   }
 
   Data certData = safeBag->getCertificate();
-  m_cert = ndn::security::v2::Certificate(std::move(certData));
-  Name identity = m_cert.getIdentity();
-  Name keyName = m_cert.getKeyName();
+  m_bootstrappingCert = ndn::security::v2::Certificate(std::move(certData));
+  Name identity =  m_bootstrappingCert.getIdentity();
+  Name keyName =  m_bootstrappingCert.getKeyName();
 
+  std::cout << "key name from safebag: " << keyName << std::endl;
   // load public key
-  const Buffer publicKeyBits = m_cert.getPublicKey();
+  const Buffer publicKeyBits = m_bootstrappingCert.getPublicKey();
   m_pub.loadPkcs8(publicKeyBits.data(), publicKeyBits.size());
 
   // load private key
   m_prv.loadPkcs8(safeBag->getEncryptedKeyBag().data(), safeBag->getEncryptedKeyBag().size(),
                   importPassword.c_str(), importPassword.size());
+
+  // add safebag to the keychain
+  try {
+    m_keyChain.importSafeBag(*safeBag, importPassword.c_str(), importPassword.size());
+  }
+  catch (const std::exception& e) {
+    return;
+  }
 }
 
 name::Component
 DevicePi::makeBootstrappingKeyDigest()
 {
-  const Buffer publicKeyBits = m_cert.getPublicKey();
+  const Buffer publicKeyBits = m_bootstrappingCert.getPublicKey();
   ndn::util::Sha256 digest;
   digest.update(publicKeyBits.data(), publicKeyBits.size());
   digest.computeDigest();
-  std::string digestStr = digest.toString();
-  Name tmpName(digestStr.substr(0, 25));
+  Name tmpName(digest.toString());
   return tmpName.at(0);
 }
 
 name::Component
-DevicePi::makeCommunicationKeyPair()
+DevicePi::makeCommunicationKeyPair(const Name& prefix)
 {
-  // TODO: zhiyi
-  return name::Component("CKpub");
+  EcKeyParams params;
+  Name identityName = prefix;
+  identityName.append(makeBootstrappingKeyDigest());
+  auto identity = m_keyChain.createIdentity(identityName, params);
+  auto cert = identity.getDefaultKey().getDefaultCertificate();
+  return name::Component(cert.wireEncode());
 }
 
 name::Component
@@ -69,4 +83,27 @@ DevicePi::makeTokenSignature(const uint64_t& token)
   Block sigValue(tlv::SignatureValue, sigOs.buf());
 
   return name::Component(sigValue);
+}
+
+
+bool
+DevicePi::verifyHash(const std::string& hash)
+{
+  auto pubKey = m_bootstrappingCert.getPublicKey();
+  auto pubKey2 = m_bootstrappingCert.getPublicKey();
+  pubKey.insert(pubKey.end(), pubKey2.begin(), pubKey2.end());
+  ndn::util::Sha256 digest;
+  digest.update(pubKey.data(), pubKey.size());
+  digest.computeDigest();
+  if (hash == digest.toString())
+    return true;
+
+  return false;
+}
+
+
+void
+DevicePi::signRequest(ndn::Interest& request)
+{
+  m_keyChain.sign(request, signingByCertificate(m_bootstrappingCert));
 }

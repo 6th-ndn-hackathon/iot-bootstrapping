@@ -5,8 +5,8 @@ CC     := g++
 BUILD_DIR ?= ./build
 SRC_DIRS := .
 
-SRCS := $(shell find $(SRC_DIRS) -name "*.cpp")
-OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
+PI_SRCS := $(shell find $(SRC_DIRS) -name "*.cpp" -not -path "./arduino/*")
+PI_OBJS := $(PI_SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
 INC_DIRS := $(shell find $(SRC_DIRS) -type d)
@@ -18,10 +18,10 @@ CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
 all: $(BUILD_DIR)/pi.app
 
 test:
-	@echo $(SRCS)
+	@echo $(PI_SRCS)
 
-$(BUILD_DIR)/pi.app: $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+$(BUILD_DIR)/pi.app: $(PI_OBJS)
+	$(CC) $(PI_OBJS) -o $@ $(LDFLAGS)
 
 # c++ source
 $(BUILD_DIR)/%.cpp.o: %.cpp

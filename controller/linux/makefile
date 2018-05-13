@@ -1,14 +1,18 @@
 NDNLIB := libndn-cxx
-CFLAGS := -std=c++11 `pkg-config --cflags $(NDNLIB)`
+CFLAGS := -std=c++11 `pkg-config --cflags $(NDNLIB)` -I../../device
 LIBS   := `pkg-config --libs $(NDNLIB)`
 CC     := g++
-TARGET := controller-sample
+OBJS   := logger.o controller-sample.o 
 
-all: $(TARGET)
+controller-sample: $(OBJS)
+	$(CC) $(OBJS) -o $@ $(LIBS)
 
-%: %.cpp
-	$(CC) $< $(LIBS) $(CFLAGS) -o $@
+controller-sample.o: controller-sample.cpp
+	$(CC) -c $< $(LIBS) $(CFLAGS) -o $@
+
+logger.o: ../../device/logger.cpp
+	$(CC) -c $< $(LIBS) $(CFLAGS) -o $@
 
 .PHONY:clean
 clean:
-	rm $(TARGET)
+	rm controller-sample $(OBJS)

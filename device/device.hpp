@@ -1,6 +1,7 @@
 #include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <iostream>
 
 class Device
 {
@@ -16,7 +17,7 @@ public:
   /**
    * @brief make a name component for the digest of the bootstrapping key
    *
-   * @return return a name component encapsulating the digest  
+   * @return return a name component encapsulating the digest
    */
   virtual ndn::name::Component
   makeBootstrappingKeyDigest() = 0;
@@ -26,12 +27,13 @@ public:
    *
    * stores the key pair for later use
    * the public key will be sent to the controller to sign
+   * @param identity prefix
    *
-   * @return return a name component encapsulating the public key bits  
+   * @return return a name component encapsulating the public key bits
    */
   virtual ndn::name::Component
-  makeCommunicationKeyPair() = 0;
-  
+  makeCommunicationKeyPair(const ndn::Name& prefix) = 0;
+
   /**
    * @brief make a name component for the signature of the token
    *
@@ -42,6 +44,9 @@ public:
   virtual ndn::name::Component
   makeTokenSignature(const uint64_t& token) = 0;
 
+  virtual bool
+  verifyHash(const std::string& hash);
+
 public:
   /**
    * @brief run the device site of the sign-on protocol
@@ -49,16 +54,15 @@ public:
    */
   int
   run();
-  
+
   /**
    * @brief make the bootstrapping request
    *
-   * name: /ndn/sign-on/Hash(BKpub)/token1/{ECDSA signature by BKpri}
+   * name: /ndn/sign-on/{digest of BKpub}/{ECDSA signature by BKpri}
    *
-   * @param token token1
    */
   ndn::Interest
-  makeBootstrappingRequest(const uint64_t& token);
+  makeBootstrappingRequest();
 
   /**
    * @brief express the bootstrapping request
@@ -68,13 +72,13 @@ public:
   expressBootstrappingRequest();
 
   void
-  onBootstrappingResponse(const ndn::Data& data, const uint64_t& token);
+  onBootstrappingResponse(const ndn::Data& data);
 
   /**
    * @brief make the certificate request
    *
-   * @params prefix the home prefix received from the bootstrap response 
-   * @params token received from the bootstrap response 
+   * @params prefix the home prefix received from the bootstrap response
+   * @params token received from the bootstrap response
    *
    * name: /[home-prefix]/cert/Hash(BKpub)/{CKpub}/{signature of token2}/{signature by BKpri}
    */
@@ -96,9 +100,9 @@ protected:
   signRequest(ndn::Interest& request);
 
   virtual bool
-  verifyData(const ndn::Data& data, const ndn::Block& certificate);
-  
+  verifyData(const ndn::Data& data, const ndn::security::v2::Certificate& certificate);
+
+  ndn::security::v2::Certificate m_anchor;
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;
 };
-

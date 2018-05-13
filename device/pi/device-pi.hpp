@@ -5,7 +5,7 @@
 class DevicePi : public Device
 {
 public:
-  DevicePi(const ndn::Name& BKName = "iot-pi");
+  DevicePi(const char* BKfile, const ndn::Name& BKName = "iot-pi");
 
 public:
   virtual void
@@ -15,14 +15,20 @@ public:
   makeBootstrappingKeyDigest();
 
   virtual ndn::name::Component
-  makeCommunicationKeyPair();
+  makeCommunicationKeyPair(const ndn::Name& prefix);
 
   virtual ndn::name::Component
   makeTokenSignature(const uint64_t& token);
 
+  virtual bool
+  verifyHash(const std::string& hash);
+
+  virtual void
+  signRequest(ndn::Interest& request);
+
 private:
   ndn::Name m_bkName;
-  ndn::security::v2::Certificate m_cert;
+  ndn::security::v2::Certificate m_bootstrappingCert;
   ndn::security::transform::PrivateKey m_prv;
   ndn::security::transform::PublicKey m_pub;
 };
