@@ -26,6 +26,28 @@ public:
   virtual void
   signRequest(ndn::Interest& request);
 
+public:
+  void
+  onRegisterFailure(const ndn::Name& prefix, const std::string& reason)
+  {
+    std::cout << "fail to register " << prefix << " due to: " << reason << std::endl;
+  }
+
+  void
+  startServices();
+  
+  void
+  startLEDService();
+
+  void
+  onLEDCommand(const ndn::Interest& command);
+
+  void
+  startCertificateService();
+
+  void
+  onCertificateRequest(const ndn::Interest& request);
+
 private:
   ndn::Name m_bkName;
   ndn::security::v2::Certificate m_bootstrappingCert;

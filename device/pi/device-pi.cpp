@@ -1,4 +1,5 @@
 #include "device-pi.hpp"
+#include <logger.hpp>
 #include <ndn-cxx/util/io.hpp>
 #include <ndn-cxx/util/sha256.hpp>
 #include <ndn-cxx/security/transform/signer-filter.hpp>
@@ -6,6 +7,7 @@
 #include <ndn-cxx/security/signing-helpers.hpp>
 #include <ndn-cxx/security/transform/stream-sink.hpp>
 #include <iostream>
+#include <stdlib.h>
 
 using namespace ndn;
 
@@ -106,4 +108,52 @@ void
 DevicePi::signRequest(ndn::Interest& request)
 {
   m_keyChain.sign(request, signingByCertificate(m_bootstrappingCert));
+}
+
+void
+DevicePi::startServices()
+{
+  LOG_INFO("start services on the device");
+  startLEDService();
+  startCertificateService();
+  m_face.processEvents();
+}
+
+void
+DevicePi::startLEDService()
+{
+  // /[home_prefix]/led
+  Name serviceName = Name(m_anchor.getIdentity()).append("led");
+  m_face.setInterestFilter(Name("/ucla/eiv396/led"),
+                           bind(&DevicePi::onLEDCommand, this, _2),
+                           bind(&DevicePi::onRegisterFailure, this, _1, _2));  
+}
+
+void
+DevicePi::startCertificateService()
+{
+  m_face.setInterestFilter(Name("ucla/eiv396/iot-pi"),//m_deviceCert.getName(),
+                           bind(&DevicePi::onCertificateRequest, this, _2),
+                           bind(&DevicePi::onRegisterFailure, this, _1, _2));
+}
+
+void
+DevicePi::onLEDCommand(const Interest& command)
+{
+  LOG_INTEREST_IN(command);
+
+  if (command.getName().get(-3).equals(Name::Component("on"))) {
+    system("python pi/control.py");
+  }
+  
+  Data data(Name(command.getName()).appendVersion());
+  m_keyChain.sign(data);
+  m_face.put(data);
+}
+
+void
+DevicePi::onCertificateRequest(const ndn::Interest& request)
+{
+  m_face.put(m_deviceCert);
+  LOG_INTEREST_IN(request);
 }

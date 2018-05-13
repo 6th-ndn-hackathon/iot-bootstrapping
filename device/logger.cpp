@@ -65,7 +65,7 @@ printInfoFromInterest(const std::string& msg, const Interest& interest)
     auto key = getKey(info);
     
       std::cerr << "[" << LoggerTimestamp{} << "][" << msg << "]:\n"
-		<< "\033[1mNAME: \033[1;31m" << name.getPrefix(-4)
+		<< "\033[1mNAME: \033[1;31m" << name.getPrefix(-2)
 		<< "\033[0m[\n      SIGNED BY \033[1m " << key << "\033[0m" << std::endl;
   }
   else {

@@ -103,6 +103,7 @@ protected:
   verifyData(const ndn::Data& data, const ndn::security::v2::Certificate& certificate);
 
   ndn::security::v2::Certificate m_anchor;
+  ndn::security::v2::Certificate m_deviceCert;
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;
 };
