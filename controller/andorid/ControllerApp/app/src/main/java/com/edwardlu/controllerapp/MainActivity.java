@@ -59,6 +59,8 @@ public class MainActivity extends AppCompatActivity{
     //qr code scanner object
     private IntentIntegrator qrScan;
 
+    boolean nfdServiceIsBound = false;
+
     // hardcoded certificate for the arduino
     String arduinoCertificate = "Bv0BVQdACAZpb3QtYXIIA0tFWQggAWLqucA7vqa6y76fAAcvrtx6bfKRy51/MktT" +
             "QTqbiWkIBHNlbGYICf0AAAFjTfV/hxQJGAECGQQANu6AFVswWTATBgcqhkjOPQIB" +
@@ -95,8 +97,6 @@ public class MainActivity extends AppCompatActivity{
 
                 Log.d(TAG, "got signal that device was scanned");
 
-                //nfdService.devices.put(MainActivity.lastBKpubDigest, new NFDService.DeviceInfo(MainActivity.lastDeviceCertificate, 0));
-
             }
         }
     };
@@ -108,6 +108,8 @@ public class MainActivity extends AppCompatActivity{
             nfdService = ((NFDService.LocalBinder) service).getService();
 
             nfdService.startNetworkThread();
+
+            nfdService.testKeysFunction();
         }
 
         @Override
@@ -166,31 +168,8 @@ public class MainActivity extends AppCompatActivity{
                 if (nfdService.keyChain == null) {
                     Log.d(TAG, "nfd keychain was null");
                 }
-
-                try {
-                    PibIdentity BKIdentity = nfdService.keyChain.createIdentityV2(new Name("BKIdentity"));
-                } catch (PibImpl.Error error) {
-                    error.printStackTrace();
-                } catch (Pib.Error error) {
-                    error.printStackTrace();
-                } catch (Tpm.Error error) {
-                    error.printStackTrace();
-                } catch (TpmBackEnd.Error error) {
-                    error.printStackTrace();
-                } catch (KeyChain.Error error) {
-                    error.printStackTrace();
-                }
             }
         });
-
-        // starts the nfd service
-        Intent nfdIntent = new Intent(MainActivity.this, NFDService.class);
-        boolean test = bindService(nfdIntent, nfdServiceConnection, BIND_AUTO_CREATE);
-        if (test) {
-            Log.d(TAG, "bindService for nfdService was successful");
-        } else {
-            Log.d(TAG, "bindService for nfdService was not successful");
-        }
 
         /*
         // /[home-prefix]/cert/Hash(BKpub)/{CKpub}/{signature of token2}/{signature by BKpri}
@@ -205,6 +184,15 @@ public class MainActivity extends AppCompatActivity{
         Log.d(TAG, CKpub.toEscapedString());
         Log.d(TAG, BKpubHash.toEscapedString());
         */
+
+        // starts the nfd service
+        Intent nfdIntent = new Intent(MainActivity.this, NFDService.class);
+        boolean test = bindService(nfdIntent, nfdServiceConnection, BIND_AUTO_CREATE);
+        if (test) {
+            Log.d(TAG, "bindService for nfdService was successful");
+        } else {
+            Log.d(TAG, "bindService for nfdService was not successful");
+        }
 
     }
 
@@ -295,7 +283,8 @@ public class MainActivity extends AppCompatActivity{
 
         unregisterReceiver(scanSignalListener);
 
-        unbindService(nfdServiceConnection);
+        if (nfdService != null)
+            unbindService(nfdServiceConnection);
 
         super.onDestroy();
     }

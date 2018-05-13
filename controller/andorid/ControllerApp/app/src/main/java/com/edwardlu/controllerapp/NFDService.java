@@ -10,6 +10,7 @@ import android.os.IBinder;
 import android.provider.ContactsContract;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.util.TimeUtils;
 
 import net.named_data.jndn.Data;
 import net.named_data.jndn.Face;
@@ -24,20 +25,27 @@ import net.named_data.jndn.OnRegisterFailed;
 import net.named_data.jndn.OnRegisterSuccess;
 import net.named_data.jndn.OnTimeout;
 import net.named_data.jndn.Sha256WithEcdsaSignature;
+import net.named_data.jndn.encoding.EncodingException;
 import net.named_data.jndn.encoding.der.DerDecodingException;
 import net.named_data.jndn.encoding.tlv.TlvEncoder;
 import net.named_data.jndn.security.KeyChain;
 import net.named_data.jndn.security.OnInterestValidationFailed;
 import net.named_data.jndn.security.OnVerified;
+import net.named_data.jndn.security.SafeBag;
 import net.named_data.jndn.security.SecurityException;
 import net.named_data.jndn.security.SigningInfo;
 import net.named_data.jndn.security.ValidatorConfigError;
 import net.named_data.jndn.security.ValidityPeriod;
+import net.named_data.jndn.security.VerificationHelpers;
 import net.named_data.jndn.security.certificate.IdentityCertificate;
 import net.named_data.jndn.security.identity.IdentityManager;
 import net.named_data.jndn.security.identity.MemoryIdentityStorage;
 import net.named_data.jndn.security.identity.MemoryPrivateKeyStorage;
+import net.named_data.jndn.security.pib.Pib;
+import net.named_data.jndn.security.pib.PibIdentity;
 import net.named_data.jndn.security.pib.PibImpl;
+import net.named_data.jndn.security.policy.PolicyManager;
+import net.named_data.jndn.security.tpm.Tpm;
 import net.named_data.jndn.security.tpm.TpmBackEnd;
 import net.named_data.jndn.security.v2.CertificateV2;
 import net.named_data.jndn.security.v2.InterestValidationFailureCallback;
@@ -46,10 +54,15 @@ import net.named_data.jndn.security.v2.ValidationError;
 import net.named_data.jndn.security.v2.ValidationPolicyFromPib;
 import net.named_data.jndn.security.v2.Validator;
 import net.named_data.jndn.util.Blob;
+import net.named_data.jndn.util.Common;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.security.Identity;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,6 +98,7 @@ public class NFDService extends Service {
     public KeyChain keyChain;
     boolean alreadyRunning;
     CertificateV2 controllerCertificate;
+    PibIdentity createdIdentity;
 
     // maps BKpubHash to device info
     public HashMap<String, DeviceInfo> devices;
@@ -159,6 +173,33 @@ public class NFDService extends Service {
         }
     }
 
+    public void testKeysFunction() {
+
+        /*
+        CertificateV2 newCert = new CertificateV2();
+
+        Data data = new Data(new Name("randomName").appendVersion(System.currentTimeMillis()));
+        data.setContent(newCert.wireEncode());
+        if (createdIdentity != null) {
+            try {
+                keyChain.sign(data, createdIdentity.getDefaultKey().getDefaultCertificate().getName());
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            } catch (Pib.Error error) {
+                error.printStackTrace();
+            } catch (PibImpl.Error error) {
+                error.printStackTrace();
+            }
+        }
+        */
+
+        if (createdIdentity == null) {
+            Log.d(TAG, "created identity was null");
+        } else {
+            Log.d(TAG, "created identity was not null");
+        }
+    }
+
     private final OnInterestCallback OnBootstrappingRequest = new OnInterestCallback() {
         @Override
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId, InterestFilter filter) {
@@ -174,16 +215,7 @@ public class NFDService extends Service {
             Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
 
             // TODO-2: zhiyi, please verify the signature here
-            Validator validator = new Validator
-                    (new ValidationPolicyFromPib(keyChain.getPib()));
-            try {
-                validator.validate(request, OnSucceededValidate, OnFailedValidate);
-            } catch (CertificateV2.Error error) {
-                error.printStackTrace();
-            } catch (ValidatorConfigError validatorConfigError) {
-                validatorConfigError.printStackTrace();
-            }
-
+            VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate);
 
             if (!devices.containsKey(BKpubHash)) {
                 Log.d(TAG, "haven't scanned the QR code for this device yet, ignoring bootstrapping request");
@@ -204,22 +236,71 @@ public class NFDService extends Service {
 
             // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
 
-            // not sure how to put all this data into a Blob correctly
-            /*
-            Blob content = new Blob();
-
             anchorCert.wireEncode();
             byte[] anchorCertBytes = anchorCert.wireEncode().getImmutableArray();
-            TlvEncoder anchorCertBytesTLV = new TlvEncoder(anchorCertBytes.length);
-            ByteBuffer anchorCertBytesByteBuffer = ByteBuffer.wrap(anchorCertBytes);
-            anchorCertBytesTLV.writeBuffer(anchorCertBytesByteBuffer);
+            TlvEncoder tlvEncodedAnchorCert = new TlvEncoder(anchorCertBytes.length);
 
-            TlvEncoder tokenBytesTLV = new TlvEncoder(8);
-            tokenBytesTLV.writeNonNegativeIntegerTlv(129, token);
+            tlvEncodedAnchorCert.writeBuffer(ByteBuffer.wrap(anchorCertBytes));
+
+            byte[] tlvEncodedAnchorCertByteArray = tlvEncodedAnchorCert.getOutput().array();
+
+            TlvEncoder tlvEncodedToken = new TlvEncoder(Long.BYTES);
+            ByteBuffer tokenByteBuffer = ByteBuffer.allocate(Long.BYTES);
+            tokenByteBuffer.putLong(devices.get(BKpubHash).token);
+
+            tlvEncodedToken.writeBuffer(tokenByteBuffer);
+
+            byte[] tlvEncodedTokenByteArray = tlvEncodedToken.getOutput().array();
+
+            TlvEncoder tlvEncodedDoubleBKpubHash = new TlvEncoder(BKpubHash.length()*2);
+
+            byte[] doubleBKpubHashBytesBuffer = new byte[BKpubHash.length() * 2];
+
+            System.arraycopy(BKpubHash.getBytes(), 0, doubleBKpubHashBytesBuffer, 0, BKpubHash.length());
+            System.arraycopy(BKpubHash.getBytes(), 0, doubleBKpubHashBytesBuffer, BKpubHash.length(), BKpubHash.length());
+
+            ByteBuffer DoubleBKpubHashByteBuffer = ByteBuffer.wrap(doubleBKpubHashBytesBuffer);
+
+            MessageDigest sha256;
+            try {
+                sha256 = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException exception) {
+                // Don't expect this to happen.
+                throw new Error
+                        ("MessageDigest: SHA-256 is not supported: " + exception.getMessage());
+            }
+
+            sha256.update(DoubleBKpubHashByteBuffer);
+            byte[] doubleBKpubHashDigestBytes = sha256.digest();
+
+            tlvEncodedDoubleBKpubHash.writeBuffer(ByteBuffer.wrap(doubleBKpubHashDigestBytes));
+
+            byte[] tlvEncodedDoubleBKpubHashByteArray = tlvEncodedDoubleBKpubHash.getOutput().array();
+
+            byte[] combinedbuffer = new byte[tlvEncodedAnchorCertByteArray.length +
+                    tlvEncodedTokenByteArray.length + tlvEncodedDoubleBKpubHashByteArray.length];
+
+            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
+                    combinedbuffer, 0, tlvEncodedAnchorCertByteArray.length);
+            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
+                    combinedbuffer, tlvEncodedAnchorCertByteArray.length, tlvEncodedTokenByteArray.length);
+            System.arraycopy(tlvEncodedAnchorCertByteArray, 0,
+                    combinedbuffer, tlvEncodedAnchorCertByteArray.length + tlvEncodedTokenByteArray.length,
+                    tlvEncodedDoubleBKpubHashByteArray.length);
+
+            TlvEncoder tlvEncodedCombinedBuffer = new TlvEncoder(tlvEncodedAnchorCertByteArray.length +
+                    tlvEncodedTokenByteArray.length + tlvEncodedDoubleBKpubHashByteArray.length);
+
+            tlvEncodedCombinedBuffer.writeBuffer(ByteBuffer.wrap(combinedbuffer));
+
+            byte[] finalDataContentByteArray = tlvEncodedCombinedBuffer.getOutput().array();
+
+            Blob content = new Blob(finalDataContentByteArray);
 
             name.appendVersion(System.currentTimeMillis());
             final Data data = new Data(name);
             data.setContent(content);
+
             try {
                 keyChain.sign(data); // sign by controller's private key
             } catch (SecurityException e) {
@@ -231,27 +312,6 @@ public class NFDService extends Service {
             } catch (KeyChain.Error error) {
                 error.printStackTrace();
             }
-
-            class OneShotTask implements Runnable {
-                Data data;
-
-                OneShotTask(Data d) {
-                    data = d;
-                }
-
-                public void run() {
-                    try {
-                        face.putData(data);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            Thread t = new Thread(new OneShotTask(data));
-            t.start();
-            */
-
-            Data data = new Data(new Name(request.getName().appendVersion(System.currentTimeMillis()).toString()));
 
             class OneShotTask implements Runnable {
                 Data data;
@@ -294,8 +354,8 @@ public class NFDService extends Service {
 
             // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
             Name name = request.getName();
-            Name.Component signatureOfToken = name.get(-3);
-            Name.Component CKpub = name.get(-4);
+            String signatureOfToken = name.get(-3).toEscapedString();
+            String CKpub = name.get(-4).toEscapedString();
             String BKpubHash = name.get(3).toEscapedString();
 
             if (!devices.containsKey(BKpubHash)) {
@@ -309,63 +369,66 @@ public class NFDService extends Service {
 
             long token = devices.get(BKpubHash).token;
             Log.d(TAG, "token of device with associated BKpubHash: " + Long.toString(token));
-            // TODO-5: zhiyi, please verify the signature of token2 here
-
-            Name deviceName = new Name(getString(R.string.homePrefix));
-            deviceName.append(BKpubHash);
-
-            /*
-            security::v2::Certificate certRequest(CKpub);
-            security::v2::Certificate newCert;
-
-            newCert.setName(certRequest.getKeyName().append("NDNCERT-IOT").appendVersion());
-            newCert.setContent(certRequest.getContent());
-            SignatureInfo signatureInfo;
-            security::ValidityPeriod period(time::system_clock::now(),
-                    time::system_clock::now() + time::days(10));
-            signatureInfo.setValidityPeriod(period);
-            security::SigningInfo signingInfo(security::SigningInfo::SIGNER_TYPE_ID,
-                    m_homePrefix, signatureInfo);
-            m_keyChain.sign(newCert);
-
-
-            CertificateV2 newCert;
-
-
-            Data data = new Data(new Name(name).appendVersion(System.currentTimeMillis()));
-            data.setContent(newCert.wireEncode());
+            // TODO-5: zhiyi, please verify the signature of token here
+            ByteBuffer tokenByteBuffer = ByteBuffer.allocate(Long.BYTES);
+            tokenByteBuffer.putLong(devices.get(BKpubHash).token);
+            boolean verification = false;
 
             try {
-                keyChain.sign(data); // sign by controller's private key
+                verification = VerificationHelpers.verifySignature(tokenByteBuffer, signatureOfToken.getBytes(),
+                        controllerCertificate.getPublicKey());
+            } catch (CertificateV2.Error error) {
+                error.printStackTrace();
+            }
+
+            if (verification) {
+                Log.d(TAG, "verification of the token signature in the certificate request interest succeeded");
+            }
+
+            byte[] decodeData = Common.base64Decode(CKpub);
+            Data keyDataPacket = new Data();
+            try {
+                keyDataPacket.wireDecode(new Blob(decodeData));
+            } catch (EncodingException e) {
+                e.printStackTrace();
+            }
+
+            CertificateV2 certRequest = null;
+
+            try {
+                certRequest = new CertificateV2(keyDataPacket);
+            } catch (CertificateV2.Error error) {
+                error.printStackTrace();
+            }
+
+            CertificateV2 newCert = new CertificateV2();
+
+            newCert.setName(certRequest.getKeyName().append("NDNCERT-IOT").appendVersion(System.currentTimeMillis()));
+            newCert.setContent(certRequest.getContent());
+            SigningInfo signingInfo = new SigningInfo(createdIdentity);
+            signingInfo.setValidityPeriod(new ValidityPeriod(System.currentTimeMillis(),
+                    System.currentTimeMillis() + TimeUnit.DAYS.toMillis(10)));
+            try {
+                keyChain.sign(newCert, createdIdentity.getDefaultKey().getDefaultCertificate().getName());
             } catch (SecurityException e) {
                 e.printStackTrace();
-            } catch (TpmBackEnd.Error error) {
+            } catch (Pib.Error error) {
                 error.printStackTrace();
             } catch (PibImpl.Error error) {
                 error.printStackTrace();
-            } catch (KeyChain.Error error) {
+            }
+
+            Data data = new Data(new Name(name).appendVersion(System.currentTimeMillis()));
+            data.setContent(newCert.wireEncode());
+            try {
+                keyChain.sign(data, createdIdentity.getDefaultKey().getDefaultCertificate().getName());
+            } catch (SecurityException e) {
+                e.printStackTrace();
+            } catch (Pib.Error error) {
+                error.printStackTrace();
+            } catch (PibImpl.Error error) {
                 error.printStackTrace();
             }
-            class OneShotTask implements Runnable {
-                Data data;
-
-                OneShotTask(Data d) {
-                    data = d;
-                }
-
-                public void run() {
-                    try {
-                        face.putData(data);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            Thread t = new Thread(new OneShotTask(data));
-            t.start();
-            */
-
-            Data data = new Data(new Name(request.getName().appendVersion(System.currentTimeMillis()).toString()));
 
             class OneShotTask implements Runnable {
                 Data data;
@@ -402,16 +465,80 @@ public class NFDService extends Service {
     };
 
     private void initializeKeyChain() {
+
         Log.d(TAG, "initializing keychain");
-        MemoryIdentityStorage identityStorage = new MemoryIdentityStorage();
-        MemoryPrivateKeyStorage privateKeyStorage = new MemoryPrivateKeyStorage();
-        IdentityManager identityManager = new IdentityManager(identityStorage, privateKeyStorage);
-        keyChain = new KeyChain(identityManager);
+        KeyChain keyChain = null;
+        try {
+            keyChain = new KeyChain("pib-memory:", "tpm-memory:");
+        } catch (KeyChain.Error error) {
+            error.printStackTrace();
+        } catch (PibImpl.Error error) {
+            error.printStackTrace();
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        createdIdentity = null;
+        try {
+            createdIdentity = keyChain.createIdentityV2(new Name("identity name"));
+        } catch (TpmBackEnd.Error error) {
+            error.printStackTrace();
+        } catch (PibImpl.Error error) {
+            error.printStackTrace();
+        } catch (Tpm.Error error) {
+            error.printStackTrace();
+        } catch (KeyChain.Error error) {
+            error.printStackTrace();
+        } catch (Pib.Error error) {
+            error.printStackTrace();
+        }
+
+        if (createdIdentity == null) {
+            Log.d(TAG, "created identity for initialize was null");
+        }
+
+        try {
+            controllerCertificate = createdIdentity.getDefaultKey().getDefaultCertificate();
+        } catch (Pib.Error error) {
+            error.printStackTrace();
+        } catch (PibImpl.Error error) {
+            error.printStackTrace();
+        }
+
+
+        if (keyChain.getIsSecurityV1()) {
+            Log.d(TAG, "keychain is security v1");
+        }
+        else {
+            Log.d(TAG, "keychain is security v2");
+        }
+
+        try {
+            keyChain.setDefaultIdentity(createdIdentity);
+        } catch (PibImpl.Error error) {
+            error.printStackTrace();
+        } catch (Pib.Error error) {
+            error.printStackTrace();
+        }
+
+
+        //Log.d(TAG, "initializing keychain");
+        //MemoryIdentityStorage identityStorage = new MemoryIdentityStorage();
+        //MemoryPrivateKeyStorage privateKeyStorage = new MemoryPrivateKeyStorage();
+        //IdentityManager identityManager = new IdentityManager(identityStorage, privateKeyStorage);
+        //keyChain = new KeyChain(identityManager);
         keyChain.setFace(face);
+
+
+
     }
 
     private void setCommandSigningInfo() {
         Log.d(TAG, "setting command signing info");
+
+        /*
         Name defaultCertificateName;
         try {
             defaultCertificateName = keyChain.getDefaultCertificateName();
@@ -428,7 +555,20 @@ public class NFDService extends Service {
                 defaultCertificateName = new Name("/controller/certificate/name");
             }
         }
+
         face.setCommandSigningInfo(keyChain, defaultCertificateName);
+        */
+
+
+        try {
+            face.setCommandSigningInfo(keyChain, keyChain.getDefaultCertificateName());
+            Log.d(TAG, "line after set command signing");
+        } catch (SecurityException e) {
+            Log.d(TAG, "exception " + e.getMessage());
+            e.printStackTrace();
+        }
+
+
     }
 
     public void expressInterest(String dataName) {
@@ -585,5 +725,16 @@ public class NFDService extends Service {
     public boolean onUnbind(Intent intent) {
 
         return super.onUnbind(intent);
+    }
+
+    private static ByteBuffer
+    toBuffer(int[] array)
+    {
+        ByteBuffer result = ByteBuffer.allocate(array.length);
+        for (int i = 0; i < array.length; ++i)
+            result.put((byte)(array[i] & 0xff));
+
+        result.flip();
+        return result;
     }
 }
