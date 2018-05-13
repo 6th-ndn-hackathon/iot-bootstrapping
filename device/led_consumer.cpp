@@ -4,18 +4,16 @@
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
 
-
 void
-onData(ndn::Face& face,
-       const ndn::Interest& interest, ndn::Data& data)
+onData(const ndn::Interest& interest, const ndn::Data& data, ndn::Face& face)
 {
   std::cout << "Interest: " << interest.toUri() << std::endl;
   std::cout << "Data: " << data.getName().toUri() << std::endl;
 }
 
 void
-onTimeout(ndn::Face& face,
-          const ndn::Interest& interest)
+onTimeout(const ndn::Interest& interest,
+          ndn::Face& face)
 {
   std::cout << "Timeout" << std::endl;
 }
@@ -32,8 +30,9 @@ int main(int argc, char** argv)
 
     ndn::Face face;
     face.expressInterest(i,
-                         bind(onData, boost::ref(face), _1, _2),
-                         bind(onTimeout, boost::ref(face), _1));
+                         bind(onData,  _1, _2, boost::ref(face)),
+                         nullptr,
+                         bind(onTimeout,  _1, boost::ref(face)));
 
     // processEvents will block until the requested data received or timeout occurs
     face.processEvents();
