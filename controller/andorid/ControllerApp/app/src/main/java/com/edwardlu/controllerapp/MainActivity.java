@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.ActivityInfo;
 import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
@@ -55,6 +56,7 @@ public class MainActivity extends AppCompatActivity{
     private Button buttonScan;
     private Button testButton;
     private TextView scanResultsDisplay;
+    private TextView logDisplay;
 
     //qr code scanner object
     private IntentIntegrator qrScan;
@@ -101,6 +103,22 @@ public class MainActivity extends AppCompatActivity{
         }
     };
 
+    BroadcastReceiver nfdStatusListener = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(NFDService.INTEREST_RECEIVED)) {
+                logDisplay.append("Interest received with name: \n" +
+                intent.getExtras().getString(NFDService.NAME));
+            }
+            if (action.equals(NFDService.DATA_SENT)) {
+                logDisplay.append("Data sent with name: \n" +
+                        intent.getExtras().getString(NFDService.NAME));
+            }
+        }
+    };
+
     private final ServiceConnection nfdServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -121,10 +139,14 @@ public class MainActivity extends AppCompatActivity{
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
         registerReceiver(scanSignalListener, getIntentFilter());
 
         // display for scan results
         scanResultsDisplay = (TextView) findViewById(R.id.scanResultsDisplay);
+
+        logDisplay = (TextView) findViewById(R.id.logDisplay);
 
         //intializing scan object
         qrScan = new IntentIntegrator(this);
@@ -273,6 +295,8 @@ public class MainActivity extends AppCompatActivity{
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
+
+
 
     public static IntentFilter getIntentFilter() {
         IntentFilter intentFilter = new IntentFilter();

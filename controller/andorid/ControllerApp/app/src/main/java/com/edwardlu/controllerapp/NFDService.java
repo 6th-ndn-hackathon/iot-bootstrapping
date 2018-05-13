@@ -82,21 +82,14 @@ public class NFDService extends Service {
     public final static String NFD_STOPPED = "NFD_STOPPED";
     public final static String FACE_CLOSED = "FACE_CLOSED";
     public final static String INTEREST_RECEIVED = "INTEREST_RECEIVED";
-    public final static String INTEREST_DISCOVER_RECEIVED = "INTEREST_DISCOVER_RECEIVED";
-    public final static String INTEREST_CONNECT_GET_SERVICES_RECEIVED = "INTEREST_CONNECT_RECEIVED";
     public final static String DATA_RECEIVED = "DATA_RECEIVED";
     public final static String INTEREST_SENT = "INTEREST_SENT";
     public final static String DATA_SENT = "DATA_SENT";
     public final static String INTEREST_TIMEOUT = "INTEREST_TIMEOUT";
     public final static String INTEREST_NACK = "INTEREST_NACK";
-    public final static String INTEREST_DISCONNECT_RECEIVED = "INTEREST_DISCONNECT_RECEIVED";
-    public final static String INTEREST_CHARACTERISTIC_ACTION_RECEIVED = "INTEREST_CHARACTERISTIC_ACTION_RECEIVED";
 
     // strings for intent extras
-    public final static String INTEREST_NAME = "INTEREST_NAME";
-    public final static String INTEREST_MAC = "INTEREST_CONNECT_MAC";
-    public final static String CHARACTERISTIC_ACTION_DATA = "CHARACTERISTIC_ACTION_DATA";
-    public final static String CHARACTERISTIC_WRITE_DATA = "CHARACTERISTIC_WRITE_DATA";
+    public final static String NAME = "NAME";
 
     private Face face;
     public KeyChain keyChain;
@@ -145,6 +138,10 @@ public class NFDService extends Service {
             OneShotTask(Data d) { data = d; }
             public void run() {
                 try {
+                    Intent dataPutIntent = new Intent(DATA_SENT);
+                    dataPutIntent.putExtra(NAME, data.getName().toString());
+                    sendBroadcast(dataPutIntent);
+
                     face.putData(data);
                 } catch (IOException e) {
                     Log.d(TAG, "failure when responding to data interest: " + e.toString());
@@ -178,8 +175,7 @@ public class NFDService extends Service {
     }
 
     public void testKeysFunction() {
-
-
+        /*
         Interest request = new Interest(
                 new Name("/ndn/sign-on/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03F04C2E20B/fakeSignature"));
 
@@ -278,12 +274,23 @@ public class NFDService extends Service {
         byte[] finalDataContentByteArray = tlvEncodedDataContent.getOutput().array();
 
         Blob content = new Blob(finalDataContentByteArray);
+        */
+
+        String testNameString = "/test/name/63=%523%63%236%55@";
+        Data testDataPacket = new Data(new Name(testNameString));
+
+        Log.d(TAG, "test data packet name: " + testDataPacket.getName());
 
     }
 
     private final OnInterestCallback OnBootstrappingRequest = new OnInterestCallback() {
         @Override
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId, InterestFilter filter) {
+
+            Intent gotInterestIntent = new Intent(INTEREST_RECEIVED);
+            gotInterestIntent.putExtra(NAME, request.getName().toString());
+            sendBroadcast(gotInterestIntent);
+
             Log.d(TAG, "Got bootstrapping request: " + request.getName().toString() + "\n");
 
             // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
@@ -310,6 +317,8 @@ public class NFDService extends Service {
                         "proceeding to process boostrapping request");
             }
 
+            Log.d(TAG, "Last Hash value from main activity: " + MainActivity.lastBKpubDigest);
+
             CertificateV2 BKpub = devices.get(BKpubHash).BKpub;
             // TODO-3: zhiyi, please verify the hash of BKpub here
 
@@ -323,6 +332,7 @@ public class NFDService extends Service {
 
             SignedBlob anchorCertBytes = anchorCert.wireEncode();
 
+/*
             byte[] doubleBKpubHashBytesBuffer = new byte[BKpubHash.length() * 2];
             Log.d(TAG, "BKpubHash length: " + BKpubHash.length());
 
@@ -351,10 +361,45 @@ public class NFDService extends Service {
 
 
             TlvEncoder tlvEncodedDataContent = new TlvEncoder();
+*/
+
+            Blob testBlob = new Blob(MainActivity.lastDeviceCertificate.getContent());
+            byte[] doubleBKpubBytesBuffer = new byte[testBlob.getImmutableArray().length * 2];
+            byte[] BKpubByteArray = testBlob.getImmutableArray();
+
+            Log.d(TAG, "BKpubByteARray length: " + BKpubByteArray.length);
+            Log.d(TAG, "doubleBKpubBytesBuffer lenght: " + doubleBKpubBytesBuffer.length);
+            Log.d(TAG, "BKpubByteArray: " + Arrays.toString(BKpubByteArray));
+
+            System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, 0, BKpubByteArray.length);
+            System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, BKpubByteArray.length, BKpubByteArray.length);
+
+            Log.d(TAG, "doubleBKpubBytesBuffer: " + Arrays.toString(doubleBKpubBytesBuffer));
+
+            ByteBuffer DoubleBKpubHashByteBuffer = ByteBuffer.wrap(doubleBKpubBytesBuffer);
+
+            Log.d(TAG, "doubleBKpubBytesBuffer after wrapping: " + Arrays.toString(DoubleBKpubHashByteBuffer.array()));
+
+            MessageDigest sha256;
+            try {
+                sha256 = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException exception) {
+                // Don't expect this to happen.
+                throw new Error
+                        ("MessageDigest: SHA-256 is not supported: " + exception.getMessage());
+            }
+
+            sha256.update(doubleBKpubBytesBuffer, 0, doubleBKpubBytesBuffer.length);
+            byte[] doubleBKpubDigestBytes = sha256.digest();
+            Blob digestBytesBlob = new Blob(doubleBKpubDigestBytes);
+            String doubleBKpubDigestBytesString = digestBytesBlob.toHex();
+            Log.d(TAG, doubleBKpubDigestBytesString);
+
+            TlvEncoder tlvEncodedDataContent = new TlvEncoder();
 
             // Encode backwards.
             tlvEncodedDataContent.writeBlobTlv(130, ByteBuffer.wrap(doubleBKpubDigestBytesString.toUpperCase().getBytes()));
-            Log.d(TAG, "Length of doubleBKPubHashDigestBytes: " + doubleBKpubHashDigestBytes.length);
+            Log.d(TAG, "Length of doubleBKPubHashDigestBytes: " + doubleBKpubDigestBytes.length);
             Log.d(TAG, "Length of tlvEncodedDataContent after writing doubleBKpubHashDigestBytes: " + tlvEncodedDataContent.getLength());
 
             tlvEncodedDataContent.writeNonNegativeIntegerTlv(129, devices.get(BKpubHash).token);
@@ -369,9 +414,6 @@ public class NFDService extends Service {
 
             // tlvEncodedDataContent.writeTypeAndLength(21, tlvEncodedDataContent.getLength());
             Log.d(TAG, "Length of tlvEncodedDataContent after writing type and length: " + tlvEncodedDataContent.getLength());
-
-
-
 
             //Log.d(TAG, "tlv encoded data content output to string: " + tlvEncodedDataContent.getOutput().toString());
 
@@ -412,6 +454,10 @@ public class NFDService extends Service {
             }
             Thread t = new Thread(new OneShotTask(data));
             t.start();
+
+            Intent sentDataIntent = new Intent(DATA_SENT);
+            sentDataIntent.putExtra(NAME, data.getName().toString());
+            sendBroadcast(sentDataIntent);
         }
     };
 
@@ -434,9 +480,14 @@ public class NFDService extends Service {
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId,
                                InterestFilter filterData) {
 
+            Intent gotInterestIntent = new Intent(INTEREST_RECEIVED);
+            gotInterestIntent.putExtra(NAME, request.getName().toString());
+            sendBroadcast(gotInterestIntent);
+
             // /[home-prefix]/cert/{digest of BKpub}/{CKpub}/{signature of token}/{signature by BKpri}
+
             Name name = request.getName();
-            Log.d(TAG, "interest name: " + name.toString());
+            Log.d(TAG, "interest name: " + name);
             String signatureOfToken = name.get(-3).toEscapedString();
             Log.d(TAG, "Signature of token of certificate request: " + signatureOfToken);
             Name.Component CKpub = name.get(-4);
@@ -461,32 +512,26 @@ public class NFDService extends Service {
             boolean verification = false;
 
             if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
-                Log.d(TAG, "verifying bootstrapping BKpri interest signature was successful");
+                Log.d(TAG, "verifying certificate request BKpri interest signature was successful");
             }
             else {
-                Log.d(TAG, "verification of bootstrapping BKpri interest signature failed");
+                Log.d(TAG, "verification of certificate request BKpri interest signature failed");
             }
 
-            /*
-            byte[] decodeData = Common.base64Decode(CKpub);
-            Data keyDataPacket = new Data();
-            try {
-                keyDataPacket.wireDecode(new Blob(decodeData));
-            } catch (EncodingException e) {
-                e.printStackTrace();
-            }
-            */
 
             Data CKpubDataPacket = new Data();
-            Log.d(TAG, "CKpub array outptu: " + CKpub.getValue().buf().toString());
+
+            /*
+            TlvEncoder tlvEncoder = new TlvEncoder();
+            tlvEncoder.writeBuffer(CKpub.getValue().buf());
+            tlvEncoder.writeTypeAndLength(6, tlvEncoder.getLength());
+            */
+
             try {
                 CKpubDataPacket.wireDecode(CKpub.getValue());
             } catch (EncodingException e) {
                 e.printStackTrace();
             }
-
-            Log.d(TAG, "after common base 64 decode");
-
             CertificateV2 certRequest = null;
 
             try {
@@ -512,20 +557,48 @@ public class NFDService extends Service {
                 error.printStackTrace();
             }
 
-            Data data = new Data(new Name(name).appendVersion(System.currentTimeMillis()));
+            /*
+            Name interestName = request.getName();
+            String firstNameComponent = interestName.get(1).toEscapedString();
+            String secondNameComponent = interestName.get(2).toEscapedString();
+            String thirdNameComponent = interestName.get(3).toEscapedString();
+            String fourthNameComponent = interestName.get(4).toEscapedString();
+            String fifthNameComponent = interestName.get(5).toEscapedString();
+            String sixthNameComponent = interestName.get(6).toEscapedString();
+            String seventhNameComponent = interestName.get(7).toEscapedString();
+            String eighthNameComponent = interestName.get(8).toEscapedString();
+
+            Name dataResponseName = new Name(
+                    "/" + firstNameComponent + "/" +
+                            secondNameComponent + "/" +
+                            thirdNameComponent + "/" +
+                            "6=" + fourthNameComponent + "/" +
+                            fifthNameComponent + "/" +
+                            sixthNameComponent + "/" +
+                            seventhNameComponent + "/" +
+                            firstNameComponent);
+
+
+            Data data = new Data(new Name(dataResponseName).appendVersion(System.currentTimeMillis()));
             data.setContent(newCert.wireEncode());
+            */
+
+            Data data = new Data(new Name(request.getName().appendVersion(System.currentTimeMillis())));
+            data.setContent(newCert.wireEncode());
+
             try {
                 keyChain.sign(data, createdIdentity.getDefaultKey().getDefaultCertificate().getName());
             } catch (SecurityException e) {
                 e.printStackTrace();
             } catch (Pib.Error error) {
                 error.printStackTrace();
-            } catch (PibImpl.Error error) {
+            }
+            catch (PibImpl.Error error) {
                 error.printStackTrace();
             }
 
-
             Log.d(TAG, "testing before the data oneshot task");
+            Log.d(TAG, "certificate request response data name: \n" + data.getName().toString());
             class OneShotTask implements Runnable {
                 Data data;
 
@@ -543,6 +616,35 @@ public class NFDService extends Service {
             }
             Thread t = new Thread(new OneShotTask(data));
             t.start();
+
+            Intent sentDataIntent = new Intent(DATA_SENT);
+            sentDataIntent.putExtra(NAME, data.getName().toString());
+            sendBroadcast(sentDataIntent);
+
+            /*
+            final Data testDataPacket = new Data(request.getName());
+
+            Log.d(TAG, "testing before the data oneshot task");
+            Log.d(TAG, "certificate request response data name: \n" + testDataPacket.getName());
+            class OneShotTask implements Runnable {
+                Data data;
+
+                OneShotTask(Data d) {
+                    data = d;
+                }
+
+                public void run() {
+                    try {
+                        face.putData(data);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            Thread t = new Thread(new OneShotTask(testDataPacket));
+            t.start();
+            */
+
         }
     };
 
@@ -741,6 +843,10 @@ public class NFDService extends Service {
 
                     interest.setMustBeFresh(true);
 
+                    Intent sendInterestIntent = new Intent(INTEREST_SENT);
+                    sendInterestIntent.putExtra(NAME, interest.getName().toString());
+                    sendBroadcast(sendInterestIntent);
+
                     face.expressInterest(interest, OnReceivedData,
                             OnInterestTimeout, OnInterestNack);
 
@@ -823,10 +929,6 @@ public class NFDService extends Service {
         filter.addAction(DATA_RECEIVED);
         filter.addAction(INTEREST_SENT);
         filter.addAction(DATA_SENT);
-        filter.addAction(INTEREST_CONNECT_GET_SERVICES_RECEIVED);
-        filter.addAction(INTEREST_DISCOVER_RECEIVED);
-        filter.addAction(INTEREST_DISCONNECT_RECEIVED);
-        filter.addAction(INTEREST_CHARACTERISTIC_ACTION_RECEIVED);
         return filter;
     }
 
