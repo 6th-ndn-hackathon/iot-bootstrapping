@@ -21,11 +21,20 @@ onTimeout(const ndn::Interest& interest,
 int main(int argc, char** argv)
 {
   try {
-    ndn::Interest i(ndn::Name("/ucla/eiv396/control/1"));
+    ndn::Interest i(ndn::Name("/ucla/eiv396/led/on"));
     i.setMustBeFresh(true);
 
     ndn::KeyChain keyChain;
-    ndn::Name cert("/ucla/eiv396/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03F04C2E20B");
+
+    std::string cert_name;
+
+    if(argc>1)
+    {
+      cert_name = argv[1];
+      std::cout << "cert name: " <<cert_name<< std::endl;
+    }
+    ndn::Name cert(cert_name);
+    
     keyChain.sign(i, signingByCertificate(cert));
 
     ndn::Face face;
