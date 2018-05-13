@@ -72,7 +72,7 @@ DevicePi::makeCommunicationKeyPair(const Name& prefix)
   identityName.append(makeBootstrappingKeyDigest());
   auto identity = m_keyChain.createIdentity(identityName, params);
   auto cert = identity.getDefaultKey().getDefaultCertificate();
-  return name::Component(cert.wireEncode());
+  return name::Component(8, cert.wireEncode().getBuffer());
 }
 
 name::Component
@@ -84,7 +84,7 @@ DevicePi::makeTokenSignature(const uint64_t& token)
   bufferSource(std::to_string(token)) >> signerFilter(DigestAlgorithm::SHA256, m_prv) >> streamSink(sigOs);
   Block sigValue(tlv::SignatureValue, sigOs.buf());
 
-  return name::Component(sigValue);
+  return name::Component(8, sigValue.getBuffer());
 }
 
 
@@ -126,7 +126,7 @@ DevicePi::startLEDService()
   Name serviceName = Name(m_anchor.getIdentity()).append("led");
   m_face.setInterestFilter(Name("/ucla/eiv396/led"),
                            bind(&DevicePi::onLEDCommand, this, _2),
-                           bind(&DevicePi::onRegisterFailure, this, _1, _2));  
+                           bind(&DevicePi::onRegisterFailure, this, _1, _2));
 }
 
 void
@@ -145,7 +145,7 @@ DevicePi::onLEDCommand(const Interest& command)
   if (command.getName().get(-3).equals(Name::Component("on"))) {
     system("python pi/control.py");
   }
-  
+
   Data data(Name(command.getName()).appendVersion());
   m_keyChain.sign(data);
   m_face.put(data);
