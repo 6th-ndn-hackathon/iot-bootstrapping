@@ -60,7 +60,7 @@ Device::onBootstrappingResponse(const ndn::Data& data)
     content.parse();
   }
   catch (const tlv::Error& e) {
-    LOG_FAILURE("sign-on", "bootstrapping request, Can not parse the response");
+    LOG_FAILURE("sign-on", "bootstrapping request, Can not parse the response " << e.what());
     return;
   }
 
