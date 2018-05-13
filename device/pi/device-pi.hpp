@@ -26,15 +26,15 @@ public:
   virtual void
   signRequest(ndn::Interest& request);
 
+  virtual void
+  startServices();
+
 public:
   void
   onRegisterFailure(const ndn::Name& prefix, const std::string& reason)
   {
     std::cout << "fail to register " << prefix << " due to: " << reason << std::endl;
   }
-
-  void
-  startServices();
   
   void
   startLEDService();

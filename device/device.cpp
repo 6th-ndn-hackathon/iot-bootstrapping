@@ -134,6 +134,8 @@ Device::onCertificateResponse(const ndn::Data& data)
     ndn::security::Key key = id.getKey(cert.getKeyName());
     m_keyChain.addCertificate(key, cert);
     m_deviceCert = cert;
+    
+    startServices();
   }
   else {
     std::cout << "can not verify the signature of the cert-request response" << std::endl;
