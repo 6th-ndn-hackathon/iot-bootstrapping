@@ -1,6 +1,7 @@
 #include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <string>
 #include <iostream>
 
 class Device
@@ -56,7 +57,7 @@ public:
    *
    */
   int
-  run();
+  run(bool needStartService = false);
 
   /**
    * @brief make the bootstrapping request
@@ -105,8 +106,40 @@ protected:
   virtual bool
   verifyData(const ndn::Data& data, const ndn::security::v2::Certificate& certificate);
 
+  virtual bool
+  getKeyLocatorName(const ndn::SignatureInfo& si, ndn::Name& name);
+  
+  virtual bool
+  getKeyLocatorName(const ndn::Interest& interest, ndn::Name& name);
+
+  virtual bool
+  getKeyLocatorName(const ndn::Data& data, ndn::Name& name);
+  
+  typedef ndn::function<void(void)> afterVerificationCallback;
+  typedef ndn::function<void(const std::string& reason)> failVerificationCallback;
+  
+  virtual void
+  verify(const ndn::Data& data,
+	 const afterVerificationCallback& cbAfterVerification,
+	 const failVerificationCallback& cbFailVerification = [] (const std::string& reason) {
+	   std::cout << reason << std::endl;
+	 });
+
+  virtual void
+  verify(const ndn::Interest& interest,
+	 const afterVerificationCallback& cbAfterVerification,
+	 const failVerificationCallback& cbFailVerification = [] (const std::string& reason) {
+	   std::cout << reason << std::endl;
+	 });
+
+  virtual void
+  onCertificate(const ndn::Data& certificate, const ndn::Interest& interest,
+		const afterVerificationCallback& cbAfterVerification,
+		const failVerificationCallback& cbFailVerification);
+
   ndn::security::v2::Certificate m_anchor;
   ndn::security::v2::Certificate m_deviceCert;
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;
+  bool m_needStartService;
 };
