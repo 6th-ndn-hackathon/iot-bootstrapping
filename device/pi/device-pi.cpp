@@ -11,11 +11,11 @@
 #include <stdlib.h>
 using namespace ndn;
 
-DevicePi::DevicePi(const char* BKfile, const Name& BKName)
-  : m_bkName(BKName)
+DevicePi::DevicePi(const char* BKfile, const std::string& host)
 {
   LOG_INFO("Pi is being constructed");
   importBootstrappingKey(BKfile);
+  m_host = Name::Component(host);
 }
 
 DevicePi::DevicePi()
@@ -81,7 +81,8 @@ DevicePi::makeCommunicationKeyPair(const Name& prefix)
 {
   EcKeyParams params;
   Name identityName = prefix;
-  identityName.append(makeBootstrappingKeyDigest());
+  //identityName.append(makeBootstrappingKeyDigest());
+  identityName.append(m_host);
   auto identity = m_keyChain.createIdentity(identityName, params);
   auto cert = identity.getDefaultKey().getDefaultCertificate();
   return name::Component(8, cert.wireEncode().getBuffer());

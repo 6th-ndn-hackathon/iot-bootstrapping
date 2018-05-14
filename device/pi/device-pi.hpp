@@ -5,7 +5,7 @@
 class DevicePi : public Device
 {
 public:
-  DevicePi(const char* BKfile, const ndn::Name& BKName = "iot-pi");
+  DevicePi(const char* BKfile, const std::string& host = "pi");
   DevicePi(); // to construct an instance for testing purpose
 
 public:
@@ -53,7 +53,6 @@ public:
   makeCommandResponse(const ndn::Interest& command, const std::string& reason);
 
 private:
-  ndn::Name m_bkName;
   ndn::security::v2::Certificate m_bootstrappingCert;
   ndn::security::transform::PrivateKey m_prv;
   ndn::security::transform::PublicKey m_pub;

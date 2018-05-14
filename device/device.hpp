@@ -142,4 +142,5 @@ protected:
   ndn::KeyChain m_keyChain;
   ndn::Face m_face;
   bool m_needStartService;
+  ndn::Name::Component m_host;
 };
