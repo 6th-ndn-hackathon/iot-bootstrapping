@@ -21,6 +21,8 @@ private:
 CommandIssuer::CommandIssuer()
 {
   m_defaultCert = m_keyChain.getPib().getDefaultIdentity().getDefaultKey().getDefaultCertificate();
+  std::cout << "### to register: " << m_defaultCert.getKeyName() << std::endl;
+  
   m_face.setInterestFilter(m_defaultCert.getKeyName(),
 			   bind(&CommandIssuer::sendCertificate, this, m_defaultCert),
 			   [] (const Name& prefix, const std::string& reason) {
