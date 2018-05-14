@@ -87,6 +87,14 @@ public class NFDService extends Service {
     public final static String DATA_SENT = "DATA_SENT";
     public final static String INTEREST_TIMEOUT = "INTEREST_TIMEOUT";
     public final static String INTEREST_NACK = "INTEREST_NACK";
+    public final static String GOT_BOOTSTRAPPING_REQUEST = "GOT_BOOTSTRAPPING_REQUEST";
+    public final static String GOT_CERTIFICATE_REQUEST = "GOT_CERTIFICATE_REQUEST";
+    public final static String BOOTSTRAPPING_GOOD = "BOOTSTRAPPING_GOOD";
+    public final static String CERTIFICATEREQUEST_GOOD = "CERTIFICATEREQUEST_GOOD";
+    public final static String BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED = "BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED";
+    public final static String BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED = "BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED";
+    public final static String CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED = "CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED";
+    public final static String CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED = "CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED";
 
     // strings for intent extras
     public final static String NAME = "NAME";
@@ -276,10 +284,10 @@ public class NFDService extends Service {
         Blob content = new Blob(finalDataContentByteArray);
         */
 
-        String testNameString = "/test/name/63=%523%63%236%55@";
-        Data testDataPacket = new Data(new Name(testNameString));
+        //String testNameString = "/test/name/63=%523%63%236%55@";
+        //Data testDataPacket = new Data(new Name(testNameString));
 
-        Log.d(TAG, "test data packet name: " + testDataPacket.getName());
+        //Log.d(TAG, "test data packet name: " + testDataPacket.getName());
 
     }
 
@@ -287,7 +295,7 @@ public class NFDService extends Service {
         @Override
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId, InterestFilter filter) {
 
-            Intent gotInterestIntent = new Intent(INTEREST_RECEIVED);
+            Intent gotInterestIntent = new Intent(GOT_BOOTSTRAPPING_REQUEST);
             gotInterestIntent.putExtra(NAME, request.getName().toString());
             sendBroadcast(gotInterestIntent);
 
@@ -306,16 +314,22 @@ public class NFDService extends Service {
             }
             else {
                 Log.d(TAG, "verification of bootstrapping BKpri interest signature failed");
+                sendBroadcast(new Intent(BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED));
+
             }
 
             if (!devices.containsKey(BKpubHash)) {
                 Log.d(TAG, "haven't scanned the QR code for this device yet, ignoring bootstrapping request");
+                sendBroadcast(new Intent(BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED));
                 return;
             }
             else {
                 Log.d(TAG, "the device's BKpubHash matched a certificate from a qr code we scanned earlier, " +
                         "proceeding to process boostrapping request");
             }
+
+            Intent bootstrappingGoodIntent = new Intent(BOOTSTRAPPING_GOOD);
+            sendBroadcast(bootstrappingGoodIntent);
 
             Log.d(TAG, "Last Hash value from main activity: " + MainActivity.lastBKpubDigest);
 
@@ -480,7 +494,7 @@ public class NFDService extends Service {
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId,
                                InterestFilter filterData) {
 
-            Intent gotInterestIntent = new Intent(INTEREST_RECEIVED);
+            Intent gotInterestIntent = new Intent(GOT_CERTIFICATE_REQUEST);
             gotInterestIntent.putExtra(NAME, request.getName().toString());
             sendBroadcast(gotInterestIntent);
 
@@ -497,6 +511,7 @@ public class NFDService extends Service {
 
             if (!devices.containsKey(BKpubHash)) {
                 Log.d(TAG, "did not find this BKpubHash for previously scanned devices: " + BKpubHash);
+                sendBroadcast(new Intent(CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED));
                 return;
             }
             else {
@@ -516,7 +531,12 @@ public class NFDService extends Service {
             }
             else {
                 Log.d(TAG, "verification of certificate request BKpri interest signature failed");
+                sendBroadcast(new Intent(CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED));
+                return;
             }
+
+            Intent certificateIntent = new Intent(CERTIFICATEREQUEST_GOOD);
+            sendBroadcast(certificateIntent);
 
 
             Data CKpubDataPacket = new Data();
@@ -929,6 +949,13 @@ public class NFDService extends Service {
         filter.addAction(DATA_RECEIVED);
         filter.addAction(INTEREST_SENT);
         filter.addAction(DATA_SENT);
+        filter.addAction(GOT_BOOTSTRAPPING_REQUEST);
+        filter.addAction(BOOTSTRAPPING_GOOD);
+        filter.addAction(CERTIFICATEREQUEST_GOOD);
+        filter.addAction(BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED);
+        filter.addAction(BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED);
+        filter.addAction(CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED);
+        filter.addAction(CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED);
         return filter;
     }
 

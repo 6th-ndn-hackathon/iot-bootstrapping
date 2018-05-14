@@ -21,8 +21,7 @@
             <TextView
                 android:id="@+id/scanResultsDisplay"
                 android:layout_width="match_parent"
-                android:layout_height="140dp"
-                android:text="TextView" />
+                android:layout_height="203dp" />
 
             <Button
                 android:id="@+id/buttonScan"

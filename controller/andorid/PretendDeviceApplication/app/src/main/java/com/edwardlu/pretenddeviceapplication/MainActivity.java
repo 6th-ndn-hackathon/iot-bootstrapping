@@ -79,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
                 nfdService.expressInterest(
-                        "/ndn/sign-on/6c05a21a2940029d372883c39bfff0046be38d7571319356a310d03f04c2e20b/BKpriSignature");
+                        "/ndn/sign-on/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03f04C2E20B/BKpriSignature");
             }
         });
 

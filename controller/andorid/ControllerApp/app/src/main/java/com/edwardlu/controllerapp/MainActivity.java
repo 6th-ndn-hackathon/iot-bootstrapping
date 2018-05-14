@@ -109,13 +109,47 @@ public class MainActivity extends AppCompatActivity{
             String action = intent.getAction();
 
             if (action.equals(NFDService.INTEREST_RECEIVED)) {
-                logDisplay.append("Interest received with name: \n" +
+                logDisplay.append("\nInterest received with name: \n" +
                 intent.getExtras().getString(NFDService.NAME));
             }
-            if (action.equals(NFDService.DATA_SENT)) {
-                logDisplay.append("Data sent with name: \n" +
+            else if (action.equals(NFDService.DATA_SENT)) {
+                logDisplay.append("\nData sent with name: \n" +
                         intent.getExtras().getString(NFDService.NAME));
             }
+            else if (action.equals(NFDService.GOT_BOOTSTRAPPING_REQUEST)) {
+                logDisplay.append("\nGot bootstrapping request with name: \n" +
+                intent.getExtras().getString(NFDService.NAME));
+            }
+            else if (action.equals(NFDService.GOT_CERTIFICATE_REQUEST)) {
+                logDisplay.append("\nGot certificate request with name: \n" +
+                intent.getExtras().getString(NFDService.NAME));
+            }
+            else if (action.equals(NFDService.BOOTSTRAPPING_GOOD)) {
+                logDisplay.append("\nWe previously scanned QR code for this device, and the " +
+                        "bootstrapping interest's signature was successfully verified.");
+            }
+            else if (action.equals(NFDService.CERTIFICATEREQUEST_GOOD)) {
+                logDisplay.append("\nWe previously scanned QR code for this device, and the " +
+                        "certificate request interest's signature was successfully verified.");
+            }
+            else if (action.equals(NFDService.BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED)) {
+                logDisplay.append("\nWe got a bootstrapping request from a device we haven't scanned yet; " +
+                        "ignoring the request.");
+            }
+            else if (action.equals(NFDService.BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED)) {
+                logDisplay.append("\nWe could not verify that a bootstrapping request was from a device " +
+                        "we previously scanned; ignoring the request.");
+            }
+            else if (action.equals(NFDService.CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED)) {
+                logDisplay.append("\nWe got a certificate request from a device we haven't scanned yet; " +
+                        "ignoring the request.");
+            }
+            else if (action.equals(NFDService.CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED)) {
+                logDisplay.append("\nWe could not verify that a certificate request was from a device we " +
+                        "previously scanned; ignoring the request.");
+            }
+
+            logDisplay.append("\n-----------\n");
         }
     };
 
@@ -142,6 +176,7 @@ public class MainActivity extends AppCompatActivity{
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         registerReceiver(scanSignalListener, getIntentFilter());
+        registerReceiver(nfdStatusListener, NFDService.getIntentFilter());
 
         // display for scan results
         scanResultsDisplay = (TextView) findViewById(R.id.scanResultsDisplay);
@@ -310,6 +345,7 @@ public class MainActivity extends AppCompatActivity{
     protected void onDestroy() {
 
         unregisterReceiver(scanSignalListener);
+        unregisterReceiver(nfdStatusListener);
 
         if (nfdService != null)
             unbindService(nfdServiceConnection);
