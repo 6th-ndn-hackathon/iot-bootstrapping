@@ -127,7 +127,6 @@ DevicePi::startServices()
   LOG_INFO("start services on the device");
   startLEDService();
   startCertificateService();
-  m_face.processEvents();
 }
 
 void
