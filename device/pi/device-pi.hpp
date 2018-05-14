@@ -6,6 +6,7 @@ class DevicePi : public Device
 {
 public:
   DevicePi(const char* BKfile, const ndn::Name& BKName = "iot-pi");
+  DevicePi(); // to construct an instance for testing purpose
 
 public:
   virtual void
@@ -47,6 +48,9 @@ public:
 
   void
   onCertificateRequest(const ndn::Interest& request);
+
+  void
+  makeCommandResponse(const ndn::Interest& command, const std::string& reason);
 
 private:
   ndn::Name m_bkName;
