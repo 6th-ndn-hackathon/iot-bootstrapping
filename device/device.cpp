@@ -183,7 +183,11 @@ Device::verify(const ndn::Interest& interest,
     return;
   }
 
-  m_face.expressInterest(Interest(klName),
+  auto certRequest = Interest(klName);
+  certRequest.setMustBeFresh(true);
+  LOG_INTEREST_OUT(certRequest);
+  
+  m_face.expressInterest(certRequest,
 			 bind(&Device::onCertificate, this,
 			      _2, interest, cbAfterVerification, cbFailVerification),
 			 bind(cbFailVerification, "NACK: can not get certificate"),
@@ -201,6 +205,9 @@ Device::verify(const ndn::Data& data,
     return;
   }
 
+  std::cout << "klName: " << klName << "\n"
+	    << "anchor: " << m_anchor.getKeyName() << std::endl;
+  
   if (klName.equals(m_anchor.getKeyName())) {
     if (ndn::security::verifySignature(data, m_anchor)) {
       cbAfterVerification();
@@ -210,6 +217,8 @@ Device::verify(const ndn::Data& data,
     }
     return;
   }
+
+  
 
   // TODO: fetch this data's cert for further verification; do not need for hackathon
 }
