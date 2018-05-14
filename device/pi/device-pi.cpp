@@ -13,7 +13,7 @@ using namespace ndn;
 
 DevicePi::DevicePi(const char* BKfile, const std::string& host)
 {
-  LOG_INFO("Pi is being constructed");
+  LOG_WELCOME("device", host);
   importBootstrappingKey(BKfile);
   m_host = Name::Component(host);
 }

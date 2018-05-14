@@ -22,7 +22,7 @@ int main(int argc, char** argv)
   bool needStartService = false;
   
   int c;
-  while ((c = getopt (argc, argv, "tsk:")) != -1) {
+  while ((c = getopt (argc, argv, "tsk:n:")) != -1) {
     switch (c) {
     case 't': isForTest = true; break;
     case 's': needStartService = true; break;
