@@ -107,7 +107,7 @@ void printInfoFromData(const std::string& msg, const Data& data)
   auto key = getKey(info);
     
     std::cerr << "[" << LoggerTimestamp{} << "][" << msg << "]:\n"
-	      << "\033[1mNAME: \033[1;32m" << name.getPrefix(-5) << "\033[0m"
+	      << "\033[1mNAME: \033[1;32m" << name.getPrefix(-3) << "\033[0m"
 	      << "[\n          SIG=" << key << "]"
 	      << "[\n          VER=" << name.get(-1).toVersion() << "]\n"
 	      << "\033[1mSIGNATURE: \033[0mSIGNED BY \033[1m " << dataKey << "\033[0m"

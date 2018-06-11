@@ -5,7 +5,8 @@
 class DevicePi : public Device
 {
 public:
-  DevicePi(const char* BKfile, const ndn::Name& BKName = "iot-pi");
+  DevicePi(const char* BKfile, const std::string& host = "pi");
+  DevicePi(); // to construct an instance for testing purpose
 
 public:
   virtual void
@@ -26,15 +27,15 @@ public:
   virtual void
   signRequest(ndn::Interest& request);
 
+  virtual void
+  startServices();
+
 public:
   void
   onRegisterFailure(const ndn::Name& prefix, const std::string& reason)
   {
     std::cout << "fail to register " << prefix << " due to: " << reason << std::endl;
   }
-
-  void
-  startServices();
   
   void
   startLEDService();
@@ -48,8 +49,10 @@ public:
   void
   onCertificateRequest(const ndn::Interest& request);
 
+  void
+  makeCommandResponse(const ndn::Interest& command, const std::string& reason);
+
 private:
-  ndn::Name m_bkName;
   ndn::security::v2::Certificate m_bootstrappingCert;
   ndn::security::transform::PrivateKey m_prv;
   ndn::security::transform::PublicKey m_pub;

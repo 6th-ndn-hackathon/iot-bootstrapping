@@ -6,16 +6,28 @@
 #include <ndn-cxx/security/transform/buffer-source.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
 #include <ndn-cxx/security/transform/stream-sink.hpp>
+#include <ndn-cxx/encoding/block-helpers.hpp>
 #include <iostream>
 #include <stdlib.h>
-
 using namespace ndn;
 
-DevicePi::DevicePi(const char* BKfile, const Name& BKName)
-  : m_bkName(BKName)
+DevicePi::DevicePi(const char* BKfile, const std::string& host)
 {
-  std::cout << "Pi is being constructed" << std::endl;
+  LOG_WELCOME("device", host);
   importBootstrappingKey(BKfile);
+  m_host = Name::Component(host);
+}
+
+DevicePi::DevicePi()
+{
+  LOG_INFO("A Test PI Is Being Constructed");
+  m_anchor = m_keyChain.getPib()
+    .getIdentity(Name("/iot")).getDefaultKey().getDefaultCertificate();
+  m_deviceCert = m_keyChain.getPib()
+    .getIdentity(Name("/iot/pi")).getDefaultKey().getDefaultCertificate();
+
+  startServices();
+  m_face.processEvents();
 }
 
 void
@@ -69,7 +81,8 @@ DevicePi::makeCommunicationKeyPair(const Name& prefix)
 {
   EcKeyParams params;
   Name identityName = prefix;
-  identityName.append(makeBootstrappingKeyDigest());
+  //identityName.append(makeBootstrappingKeyDigest());
+  identityName.append(m_host);
   auto identity = m_keyChain.createIdentity(identityName, params);
   auto cert = identity.getDefaultKey().getDefaultCertificate();
   return name::Component(8, cert.wireEncode().getBuffer());
@@ -86,7 +99,6 @@ DevicePi::makeTokenSignature(const uint64_t& token)
 
   return name::Component(8, sigValue.getBuffer());
 }
-
 
 bool
 DevicePi::verifyHash(const std::string& hash)
@@ -116,7 +128,6 @@ DevicePi::startServices()
   LOG_INFO("start services on the device");
   startLEDService();
   startCertificateService();
-  m_face.processEvents();
 }
 
 void
@@ -142,13 +153,13 @@ DevicePi::onLEDCommand(const Interest& command)
 {
   LOG_INTEREST_IN(command);
 
-  if (command.getName().get(-3).equals(Name::Component("on"))) {
+  afterVerificationCallback cbAfterVerification = [this, command] {
     system("python pi/control.py");
-  }
-
-  Data data(Name(command.getName()).appendVersion());
-  m_keyChain.sign(data);
-  m_face.put(data);
+    makeCommandResponse(command, "OK");
+  };
+  
+  verify(command, cbAfterVerification,
+	 bind(&DevicePi::makeCommandResponse, this, command, _1));
 }
 
 void
@@ -156,4 +167,13 @@ DevicePi::onCertificateRequest(const ndn::Interest& request)
 {
   LOG_INTEREST_IN(request);
   m_face.put(m_deviceCert);
+}
+
+void
+DevicePi::makeCommandResponse(const Interest& command, const std::string& reason)
+{
+  Data data(Name(command.getName()).appendVersion());
+  data.setContent(makeStringBlock(tlv::Content, reason));
+  m_keyChain.sign(data);
+  m_face.put(data);
 }
