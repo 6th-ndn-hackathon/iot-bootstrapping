@@ -55,7 +55,6 @@ public class MainActivity extends AppCompatActivity{
     //View Objects
     private Button buttonScan;
     private Button testButton;
-    private TextView scanResultsDisplay;
     private TextView logDisplay;
 
     //qr code scanner object
@@ -99,6 +98,15 @@ public class MainActivity extends AppCompatActivity{
 
                 Log.d(TAG, "got signal that device was scanned");
 
+                /*
+                if (nfdService != null && nfdService.devices != null) {
+                    nfdService.devices.put(MainActivity.lastBKpubDigest, new NFDService.DeviceInfo(MainActivity.lastDeviceCertificate, 0));
+                    Log.d(TAG, "auto device scan was good");
+                }
+                else {
+                    Log.d(TAG, "nfd service or nfd service devices were null inside device scanned listener");
+                }
+                */
             }
         }
     };
@@ -112,6 +120,7 @@ public class MainActivity extends AppCompatActivity{
                 logDisplay.append("\nInterest received with name: \n" +
                 intent.getExtras().getString(NFDService.NAME));
             }
+            /*
             else if (action.equals(NFDService.DATA_SENT)) {
                 logDisplay.append("\nData sent with name: \n" +
                         intent.getExtras().getString(NFDService.NAME));
@@ -125,12 +134,12 @@ public class MainActivity extends AppCompatActivity{
                 intent.getExtras().getString(NFDService.NAME));
             }
             else if (action.equals(NFDService.BOOTSTRAPPING_GOOD)) {
-                logDisplay.append("\nWe previously scanned QR code for this device, and the " +
-                        "bootstrapping interest's signature was successfully verified.");
+                //logDisplay.append("\nWe previously scanned QR code for this device, and the " +
+                //        "bootstrapping interest's signature was successfully verified.");
             }
             else if (action.equals(NFDService.CERTIFICATEREQUEST_GOOD)) {
-                logDisplay.append("\nWe previously scanned QR code for this device, and the " +
-                        "certificate request interest's signature was successfully verified.");
+                //logDisplay.append("\nWe previously scanned QR code for this device, and the " +
+                //        "certificate request interest's signature was successfully verified.");
             }
             else if (action.equals(NFDService.BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED)) {
                 logDisplay.append("\nWe got a bootstrapping request from a device we haven't scanned yet; " +
@@ -147,6 +156,15 @@ public class MainActivity extends AppCompatActivity{
             else if (action.equals(NFDService.CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED)) {
                 logDisplay.append("\nWe could not verify that a certificate request was from a device we " +
                         "previously scanned; ignoring the request.");
+            }
+            */
+            else if (action.equals(NFDService.REPLIED_TO_BOOTSTRAPPING)) {
+                logDisplay.append("\nWe responded to a valid bootstrapping request with a data packet with name: "
+                + intent.getExtras().getString(NFDService.NAME));
+            }
+            else if (action.equals(NFDService.REPLIED_TO_CERTIFICATEREQUEST)) {
+                logDisplay.append("\nWe responded to a valid certificate request with a data packet with name: "
+                + intent.getExtras().getString(NFDService.NAME));
             }
 
             logDisplay.append("\n-----------\n");
@@ -177,9 +195,6 @@ public class MainActivity extends AppCompatActivity{
 
         registerReceiver(scanSignalListener, getIntentFilter());
         registerReceiver(nfdStatusListener, NFDService.getIntentFilter());
-
-        // display for scan results
-        scanResultsDisplay = (TextView) findViewById(R.id.scanResultsDisplay);
 
         logDisplay = (TextView) findViewById(R.id.logDisplay);
 
@@ -266,8 +281,6 @@ public class MainActivity extends AppCompatActivity{
             if (result.getContents().equals(arduinoCertificate) || result.getContents().equals(piCertificate)) {
 
                 String scanResults = result.getContents();
-
-                scanResultsDisplay.setText(scanResults);
 
                 lastScanResult = scanResults;
 

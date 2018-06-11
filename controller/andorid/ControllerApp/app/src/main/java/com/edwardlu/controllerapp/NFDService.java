@@ -95,6 +95,8 @@ public class NFDService extends Service {
     public final static String BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED = "BOOTSTRAPPING_BAD_DEVICE_NOT_SCANNED";
     public final static String CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED = "CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED";
     public final static String CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED = "CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED";
+    public final static String REPLIED_TO_BOOTSTRAPPING = "REPLIED_TO_BOOTSTRAPPING";
+    public final static String REPLIED_TO_CERTIFICATEREQUEST = "REPLIED_TO_CERTIFICATEREQUEST";
 
     // strings for intent extras
     public final static String NAME = "NAME";
@@ -182,115 +184,6 @@ public class NFDService extends Service {
         }
     }
 
-    public void testKeysFunction() {
-        /*
-        Interest request = new Interest(
-                new Name("/ndn/sign-on/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03F04C2E20B/fakeSignature"));
-
-        // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
-        Name name = request.getName();
-        String BKpubHash = name.get(2).toEscapedString();
-        Log.d(TAG, "BKpubHash of interest: " + BKpubHash);
-        String BKpriSignatureString = name.get(3).toEscapedString();
-        Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
-
-        // TODO-2: zhiyi, please verify the signature here
-        if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
-            Log.d(TAG, "verifying bootstrapping BKpri interest signature was successful");
-        }
-        else {
-            Log.d(TAG, "verification of bootstrapping BKpri interest signature failed");
-        }
-
-        if (!devices.containsKey(BKpubHash)) {
-            Log.d(TAG, "haven't scanned the QR code for this device yet, ignoring bootstrapping request");
-            return;
-        }
-        else {
-            Log.d(TAG, "the device's BKpubHash matched a certificate from a qr code we scanned earlier, " +
-                    "proceeding to process boostrapping request");
-        }
-
-        CertificateV2 BKpub = devices.get(BKpubHash).BKpub;
-        // TODO-3: zhiyi, please verify the hash of BKpub here
-
-        CertificateV2 anchorCert = controllerCertificate;
-        SecureRandom randomNumberGenerator = new SecureRandom();
-        long token = Math.abs(randomNumberGenerator.nextLong());
-        devices.get(BKpubHash).token = token;
-
-
-        // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
-
-        SignedBlob anchorCertBytes = anchorCert.wireEncode();
-
-        Blob testBlob = new Blob(MainActivity.lastDeviceCertificate.getContent());
-        byte[] doubleBKpubBytesBuffer = new byte[testBlob.getImmutableArray().length * 2];
-        byte[] BKpubByteArray = testBlob.getImmutableArray();
-
-        Log.d(TAG, "BKpubByteARray length: " + BKpubByteArray.length);
-        Log.d(TAG, "doubleBKpubBytesBuffer lenght: " + doubleBKpubBytesBuffer.length);
-        Log.d(TAG, "BKpubByteArray: " + Arrays.toString(BKpubByteArray));
-
-        System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, 0, BKpubByteArray.length);
-        System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, BKpubByteArray.length, BKpubByteArray.length);
-
-        Log.d(TAG, "doubleBKpubBytesBuffer: " + Arrays.toString(doubleBKpubBytesBuffer));
-
-        ByteBuffer DoubleBKpubHashByteBuffer = ByteBuffer.wrap(doubleBKpubBytesBuffer);
-
-        Log.d(TAG, "doubleBKpubBytesBuffer after wrapping: " + Arrays.toString(DoubleBKpubHashByteBuffer.array()));
-
-        MessageDigest sha256;
-        try {
-            sha256 = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException exception) {
-            // Don't expect this to happen.
-            throw new Error
-                    ("MessageDigest: SHA-256 is not supported: " + exception.getMessage());
-        }
-
-        sha256.update(doubleBKpubBytesBuffer, 0, doubleBKpubBytesBuffer.length);
-        byte[] doubleBKpubDigestBytes = sha256.digest();
-        Blob digestBytesBlob = new Blob(doubleBKpubDigestBytes);
-        String doubleBKpubHashDigestBytesString = digestBytesBlob.toHex();
-        Log.d(TAG, doubleBKpubHashDigestBytesString);
-
-        TlvEncoder tlvEncodedDataContent = new TlvEncoder();
-
-        // Encode backwards.
-        tlvEncodedDataContent.writeBlobTlv(130, ByteBuffer.wrap(doubleBKpubDigestBytes));
-        Log.d(TAG, "Length of doubleBKPubDigestBytes: " + doubleBKpubDigestBytes.length);
-        Log.d(TAG, "Length of tlvEncodedDataContent after writing doubleBKpubHashDigestBytes: " + tlvEncodedDataContent.getLength());
-
-        tlvEncodedDataContent.writeNonNegativeIntegerTlv(129, devices.get(BKpubHash).token);
-        Log.d(TAG, "value of token from BKpubHash: " + Long.toString(devices.get(BKpubHash).token));
-        Log.d(TAG, "Length of tlvEncodedDataContent after writing token: " + tlvEncodedDataContent.getLength());
-
-        tlvEncodedDataContent.writeBuffer(anchorCert.wireEncode().buf());
-        //tlvEncodedDataContent.writeBlobTlv(6, anchorCertBytes.buf());
-        Log.d(TAG, "Length of anchorCertBytes: " + anchorCertBytes.signedSize());
-        Log.d(TAG, "Length of tlvEncodedDataContent after writing anchorCertBytes: " + tlvEncodedDataContent.getLength());
-
-        tlvEncodedDataContent.writeTypeAndLength(21, tlvEncodedDataContent.getLength());
-        Log.d(TAG, "Length of tlvEncodedDataContent after writing type and length: " + tlvEncodedDataContent.getLength());
-
-        //TlvDecoder tlvDecoder = new TlvDecoder()
-
-        //Log.d(TAG, "tlv encoded data content output to string: " + tlvEncodedDataContent.getOutput().toString());
-
-        byte[] finalDataContentByteArray = tlvEncodedDataContent.getOutput().array();
-
-        Blob content = new Blob(finalDataContentByteArray);
-        */
-
-        //String testNameString = "/test/name/63=%523%63%236%55@";
-        //Data testDataPacket = new Data(new Name(testNameString));
-
-        //Log.d(TAG, "test data packet name: " + testDataPacket.getName());
-
-    }
-
     private final OnInterestCallback OnBootstrappingRequest = new OnInterestCallback() {
         @Override
         public void onInterest(Name prefix, Interest request, final Face face, long interestFilterId, InterestFilter filter) {
@@ -309,7 +202,7 @@ public class NFDService extends Service {
             Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
 
             // TODO-2: zhiyi, please verify the signature here
-            if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
+            if (VerificationHelpers.verifyInterestSignature(request, devices.get(BKpubHash).BKpub)) {
                 Log.d(TAG, "verifying bootstrapping BKpri interest signature was successful");
             }
             else {
@@ -331,7 +224,6 @@ public class NFDService extends Service {
             Intent bootstrappingGoodIntent = new Intent(BOOTSTRAPPING_GOOD);
             sendBroadcast(bootstrappingGoodIntent);
 
-            Log.d(TAG, "Last Hash value from main activity: " + MainActivity.lastBKpubDigest);
 
             CertificateV2 BKpub = devices.get(BKpubHash).BKpub;
             // TODO-3: zhiyi, please verify the hash of BKpub here
@@ -377,7 +269,7 @@ public class NFDService extends Service {
             TlvEncoder tlvEncodedDataContent = new TlvEncoder();
 */
 
-            Blob testBlob = new Blob(MainActivity.lastDeviceCertificate.getContent());
+            Blob testBlob = new Blob(devices.get(BKpubHash).BKpub.getContent());
             byte[] doubleBKpubBytesBuffer = new byte[testBlob.getImmutableArray().length * 2];
             byte[] BKpubByteArray = testBlob.getImmutableArray();
 
@@ -469,7 +361,7 @@ public class NFDService extends Service {
             Thread t = new Thread(new OneShotTask(data));
             t.start();
 
-            Intent sentDataIntent = new Intent(DATA_SENT);
+            Intent sentDataIntent = new Intent(REPLIED_TO_BOOTSTRAPPING);
             sentDataIntent.putExtra(NAME, data.getName().toString());
             sendBroadcast(sentDataIntent);
         }
@@ -526,7 +418,7 @@ public class NFDService extends Service {
             tokenByteBuffer.putLong(devices.get(BKpubHash).token);
             boolean verification = false;
 
-            if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
+            if (VerificationHelpers.verifyInterestSignature(request, devices.get(BKpubHash).BKpub)) {
                 Log.d(TAG, "verifying certificate request BKpri interest signature was successful");
             }
             else {
@@ -637,7 +529,7 @@ public class NFDService extends Service {
             Thread t = new Thread(new OneShotTask(data));
             t.start();
 
-            Intent sentDataIntent = new Intent(DATA_SENT);
+            Intent sentDataIntent = new Intent(REPLIED_TO_CERTIFICATEREQUEST);
             sentDataIntent.putExtra(NAME, data.getName().toString());
             sendBroadcast(sentDataIntent);
 
@@ -956,6 +848,8 @@ public class NFDService extends Service {
         filter.addAction(BOOTSTRAPPING_BAD_SIGNATURE_VERIFY_FAILED);
         filter.addAction(CERTIFICATEREQUEST_BAD_DEVICE_NOT_SCANNED);
         filter.addAction(CERTIFICATEREQUEST_BAD_SIGNATURE_VERIFY_FAILED);
+        filter.addAction(REPLIED_TO_BOOTSTRAPPING);
+        filter.addAction(REPLIED_TO_CERTIFICATEREQUEST);
         return filter;
     }
 
@@ -1010,14 +904,107 @@ public class NFDService extends Service {
         return super.onUnbind(intent);
     }
 
-    private static ByteBuffer
-    toBuffer(int[] array)
-    {
-        ByteBuffer result = ByteBuffer.allocate(array.length);
-        for (int i = 0; i < array.length; ++i)
-            result.put((byte)(array[i] & 0xff));
+    public void testKeysFunction() {
 
-        result.flip();
-        return result;
+        Interest request = new Interest(
+                new Name("/ndn/sign-on/6C05A21A2940029D372883C39BFFF0046BE38D7571319356A310D03F04C2E20B/fakeSignature"));
+
+        // /ndn/sign-on/Hash(BKpub)/{ECDSA signature by BKpri}
+        Name name = request.getName();
+        String BKpubHash = name.get(2).toEscapedString();
+        Log.d(TAG, "BKpubHash of interest: " + BKpubHash);
+        String BKpriSignatureString = name.get(3).toEscapedString();
+        Log.d(TAG, "BKpriSignature: " + BKpriSignatureString);
+
+        // TODO-2: zhiyi, please verify the signature here
+        if (VerificationHelpers.verifyInterestSignature(request, MainActivity.lastDeviceCertificate)) {
+            Log.d(TAG, "verifying bootstrapping BKpri interest signature was successful");
+        }
+        else {
+            Log.d(TAG, "verification of bootstrapping BKpri interest signature failed");
+        }
+
+        if (!devices.containsKey(BKpubHash)) {
+            Log.d(TAG, "haven't scanned the QR code for this device yet, ignoring bootstrapping request");
+            return;
+        }
+        else {
+            Log.d(TAG, "the device's BKpubHash matched a certificate from a qr code we scanned earlier, " +
+                    "proceeding to process boostrapping request");
+        }
+
+        CertificateV2 BKpub = devices.get(BKpubHash).BKpub;
+        // TODO-3: zhiyi, please verify the hash of BKpub here
+
+        CertificateV2 anchorCert = controllerCertificate;
+        SecureRandom randomNumberGenerator = new SecureRandom();
+        long token = Math.abs(randomNumberGenerator.nextLong());
+        devices.get(BKpubHash).token = token;
+
+
+        // TODO-4: zhiyi, please encrypt controller's public key, token1, token2 by BKpub, and then add the encryption to the data content
+
+        SignedBlob anchorCertBytes = anchorCert.wireEncode();
+
+        Blob testBlob = new Blob(devices.get(BKpubHash).BKpub.getContent());
+        byte[] doubleBKpubBytesBuffer = new byte[testBlob.getImmutableArray().length * 2];
+        byte[] BKpubByteArray = testBlob.getImmutableArray();
+
+        Log.d(TAG, "BKpubByteARray length: " + BKpubByteArray.length);
+        Log.d(TAG, "doubleBKpubBytesBuffer lenght: " + doubleBKpubBytesBuffer.length);
+        Log.d(TAG, "BKpubByteArray: " + Arrays.toString(BKpubByteArray));
+
+        System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, 0, BKpubByteArray.length);
+        System.arraycopy(BKpubByteArray, 0, doubleBKpubBytesBuffer, BKpubByteArray.length, BKpubByteArray.length);
+
+        Log.d(TAG, "doubleBKpubBytesBuffer: " + Arrays.toString(doubleBKpubBytesBuffer));
+
+        ByteBuffer DoubleBKpubHashByteBuffer = ByteBuffer.wrap(doubleBKpubBytesBuffer);
+
+        Log.d(TAG, "doubleBKpubBytesBuffer after wrapping: " + Arrays.toString(DoubleBKpubHashByteBuffer.array()));
+
+        MessageDigest sha256;
+        try {
+            sha256 = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException exception) {
+            // Don't expect this to happen.
+            throw new Error
+                    ("MessageDigest: SHA-256 is not supported: " + exception.getMessage());
+        }
+
+        sha256.update(doubleBKpubBytesBuffer, 0, doubleBKpubBytesBuffer.length);
+        byte[] doubleBKpubDigestBytes = sha256.digest();
+        Blob digestBytesBlob = new Blob(doubleBKpubDigestBytes);
+        String doubleBKpubHashDigestBytesString = digestBytesBlob.toHex();
+
+        Log.d(TAG, doubleBKpubHashDigestBytesString);
+
+        TlvEncoder tlvEncodedDataContent = new TlvEncoder();
+
+        // Encode backwards.
+        tlvEncodedDataContent.writeBlobTlv(130, ByteBuffer.wrap(doubleBKpubDigestBytes));
+        Log.d(TAG, "Length of doubleBKPubDigestBytes: " + doubleBKpubDigestBytes.length);
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing doubleBKpubHashDigestBytes: " + tlvEncodedDataContent.getLength());
+
+        tlvEncodedDataContent.writeNonNegativeIntegerTlv(129, devices.get(BKpubHash).token);
+        Log.d(TAG, "value of token from BKpubHash: " + Long.toString(devices.get(BKpubHash).token));
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing token: " + tlvEncodedDataContent.getLength());
+
+        tlvEncodedDataContent.writeBuffer(anchorCert.wireEncode().buf());
+        //tlvEncodedDataContent.writeBlobTlv(6, anchorCertBytes.buf());
+        Log.d(TAG, "Length of anchorCertBytes: " + anchorCertBytes.signedSize());
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing anchorCertBytes: " + tlvEncodedDataContent.getLength());
+
+        tlvEncodedDataContent.writeTypeAndLength(21, tlvEncodedDataContent.getLength());
+        Log.d(TAG, "Length of tlvEncodedDataContent after writing type and length: " + tlvEncodedDataContent.getLength());
+
+        //TlvDecoder tlvDecoder = new TlvDecoder()
+
+        //Log.d(TAG, "tlv encoded data content output to string: " + tlvEncodedDataContent.getOutput().toString());
+
+        byte[] finalDataContentByteArray = tlvEncodedDataContent.getOutput().array();
+
+        Blob content = new Blob(finalDataContentByteArray);
+
     }
 }
