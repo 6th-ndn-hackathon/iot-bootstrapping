@@ -1,4 +1,5 @@
 device/build/*
 controller/linux/controller-sample
+.DS*
 *.o
 *.app
